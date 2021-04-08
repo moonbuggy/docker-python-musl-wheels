@@ -1,0 +1,10 @@
+.git*
+.dockerignore
+*.md
+Dockerfile*
+hooks
+build.conf
+.build_data
+arch.yaml
+build.sh
+wheels
