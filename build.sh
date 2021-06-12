@@ -7,7 +7,7 @@
 DOCKER_REPO="${DOCKER_REPO:-moonbuggy2000/python-musl-wheels}"
 
 all_tags='latest'
-default_tag='latest'
+default_tag='cffi toml'
 
 . "hooks/.build.sh"
 

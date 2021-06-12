@@ -29,6 +29,13 @@ for DOCKER_TAG in ${tags}; do
 	. hooks/build
 done
 
+## then do post-build
+#
+for DOCKER_TAG in ${tags}; do
+	IMAGE_NAME="${DOCKER_REPO}:${DOCKER_TAG}"
+	. hooks/post_build
+done
+
 ## then push base tags
 #
 if [ -z "${POST_PUSH_ONLY+set}" ]; then
