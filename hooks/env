@@ -150,7 +150,7 @@ python_get_module_from_string () {
 	done
 
 	mod_namever="${mod_namever/#-/}"
-	mod_longname="${mod_namever%%[0-9].*}"
+	mod_longname="${mod_namever%%[0-9.]*}"
 
 	case "${mod_longname##*-}" in
 		libressl|openssl)

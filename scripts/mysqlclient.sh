@@ -1,3 +1,9 @@
-#! /bin/ash
+#! /bin/sh
 
-apk -U add mariadb-connector-c-dev
+mod_depends () {
+	return
+}
+
+mod_build () {
+	apk -U add mariadb-connector-c-dev
+}

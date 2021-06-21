@@ -1,3 +1,9 @@
-#! /bin/ash
+#! /bin/sh
 
-apk -U add "postgresql-dev"
+mod_depends () {
+	return
+}
+
+mod_build () {
+	apk -U add "postgresql-dev"
+}

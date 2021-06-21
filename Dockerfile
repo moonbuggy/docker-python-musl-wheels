@@ -68,8 +68,8 @@ ENV	MODULE_NAME="${MODULE_NAME}" \
 COPY _dummyfile "scripts/${MODULE_SCRIPT}*" ./
 
 RUN echo "Building ${MODULE_NAME}==${MODULE_VERSION}.." \
-	&& [ ! -f "${MODULE_SCRIPT}" ] \
-		|| . "${MODULE_SCRIPT}" \
+	&& if [ ! -f "${MODULE_SCRIPT}" ]; then true; else \
+		. "${MODULE_SCRIPT}" && mod_build; fi \
 	&& [ ! -z "${WHEEL_BUILT_IN_SCRIPT+set}" ] \
 		|| python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_DIR}" "${MODULE_NAME}==${MODULE_VERSION}"
 

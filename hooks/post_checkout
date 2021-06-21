@@ -23,7 +23,7 @@ case "${DOCKER_TAG##*-}" in
 		[ -z "${TARGET_TAG+set}" ] && \
 			TARGET_TAG="${DOCKER_TAG%-*}"
 		add_param "${DOCKER_TAG##*-}" 'BUILD_ARCH'
-		[ -z "${SINGLE_ARCH_BUILD}" ] && SINGLE_ARCH_BUILD=1
+		[ -z "${SINGLE_ARCH_BUILD+set}" ] && SINGLE_ARCH_BUILD=1
 		;;
 	*)
 		[ -z "${TARGET_TAG+set}" ] && \
@@ -93,7 +93,6 @@ else
 	if [ -n "${EXCLUDED_ARCHES+set}" ]; then
 		print_param "${EXCLUDED_ARCHES}" 'Excluded arches'
 		for excluded in ${EXCLUDED_ARCHES}; do
-			#configured_arches="$(echo "${configured_arches//${excluded} / }" | sort -u | xargs)"
 			configured_arches="$(echo "${configured_arches}" | xargs -n1 | grep -v "^${excluded}$" | sort -u | xargs)"
 		done
 	fi
@@ -108,9 +107,6 @@ else
 
 	print_param "${source_arches}" 'Source arches'
 
-	# build_arches="$(comm -12 \
-		# <(printf '%s\n' ${configured_arches} | LC_ALL=C sort) \
-		# <(printf '%s\n' ${source_arches} | LC_ALL=C sort) | xargs)"
 	build_arches="$(comm -12 \
 		<(echo "${configured_arches}" | xargs -n1 | LC_ALL=C sort) \
 		<(echo "${source_arches}" | xargs -n1 | LC_ALL=C sort) \
@@ -129,6 +125,10 @@ for arch in ${build_arches}; do
   platforms="${platforms},${!platform_string}"
 done
 add_print_param "${platforms:1}" 'platforms' 'Platforms'
+
+[ -z "${platforms}" ] \
+	&& echo "No platforms found. Exiting." \
+	&& exit 1
 
 add_print_param "${SOURCE_IMAGE}" 'SOURCE_IMAGE' 'Source image'
 

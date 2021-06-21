@@ -1,3 +1,9 @@
-#! /bin/ash
+#! /bin/sh
 
-apk -U add libxml2-dev libxslt-dev
+mod_depends () {
+	return
+}
+
+mod_build () {
+	apk -U add libxml2-dev libxslt-dev
+}

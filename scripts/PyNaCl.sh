@@ -1,3 +1,9 @@
-#! /bin/ash
+#! /bin/sh
 
-export LIBSODIUM_MAKE_ARGS="-j$(nproc)"
+mod_depends () {
+	return
+}
+
+mod_build () {
+	export LIBSODIUM_MAKE_ARGS="-j$(nproc)"
+}
