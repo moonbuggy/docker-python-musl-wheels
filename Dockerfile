@@ -1,12 +1,11 @@
-ARG PYTHON_VERSION="3.8"
-ARG FROM_IMAGE="moonbuggy2000/alpine-s6-python:${PYTHON_VERSION}"
+ARG BUILD_PYTHON_VERSION="3.8"
+ARG FROM_IMAGE="python:${BUILD_PYTHON_VERSION}-alpine"
 
-ARG PYTHON_MAJOR="3"
+#ARG PYTHON_MAJOR="3"
 
 ARG WHEELS_DIR="/wheels"
 
 #ARG DEFAULT_MODULES="cffi pycparser setuptools-rust toml"
-ARG DEFAULT_MODULES="cffi pycparser toml"
 
 ARG TARGET_ARCH_TAG
 
@@ -19,16 +18,23 @@ ARG QEMU_DIR
 ARG QEMU_ARCH=""
 COPY _dummyfile "${QEMU_DIR}/qemu-${QEMU_ARCH}-static*" /usr/bin/
 
-ARG PYTHON_MAJOR
-RUN apk -U add \
+# allow apk to cache because some module scripts may run apk
+ARG BUILD_PYTHON_VERSION
+RUN apk add \
 		cargo \
 		ccache \
 		gcc \
 		libffi-dev \
 		make \
 		musl-dev \
-		python"${PYTHON_MAJOR}"-dev \
+#		python"${BUILD_PYTHON_VERSION%%.*}"-dev \
 		rust
+
+# version check in case we accidentally upgraded Python along the way
+RUN _pyver="$(python --version | sed -En 's|Python\s+([0-9.]*)|\1|p' | awk -F \. '{print $1"."$2}')" \
+	&& if [ "x${_pyver}" != "x${BUILD_PYTHON_VERSION}" ]; then \
+		echo "ERROR: Python reports version ${_pyver}, doesn't match build version ${BUILD_PYTHON_VERSION}"; \
+		echo "Exiting"; exit 1; fi
 
 ARG BUILDER_ROOT="/builder-root"
 WORKDIR "${BUILDER_ROOT}"
@@ -43,15 +49,15 @@ RUN python -m pip install --upgrade virtualenv
 RUN python -m virtualenv --download "${VIRTUAL_ENV}"
 
 # Python wheels from pre_build
-ARG IMPORTS_DIR
-ARG TARGET_ARCH_TAG
+ARG IMPORTS_DIR=""
+ARG TARGET_ARCH_TAG=""
 COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
 
 # activate virtual env
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
-ARG DEFAULT_MODULES
-RUN python -m pip install --only-binary=:all: --find-links "/${IMPORTS_DIR}/"  ${DEFAULT_MODULES} \
+ARG DEFAULT_MODULES="cffi pycparser toml"
+RUN python -m pip install --only-binary=:all: --find-links "/${IMPORTS_DIR}/" ${DEFAULT_MODULES} \
 	|| python -m pip install --find-links "/${IMPORTS_DIR}/" ${DEFAULT_MODULES}
 
 ARG MODULE_NAME
@@ -75,9 +81,6 @@ RUN echo "Building ${MODULE_NAME}==${MODULE_VERSION}.." \
 
 ## collect the wheels
 #
-# results in linux/amd64 platform
-#FROM scratch
-
 # results in platform that matches arch
 FROM "moonbuggy2000/scratch:${TARGET_ARCH_TAG}"
 

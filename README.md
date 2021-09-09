@@ -51,7 +51,7 @@ RUN python3 -m pip install /wheels/*
 # and/or
 RUN python3 -m pip install --find-links /wheels/ <whatever>
 
-# .. etcetera, or whatever .. 
+# .. etcetera, or whatever ..
 ```
 
 ## Building the Docker images
@@ -59,24 +59,25 @@ RUN python3 -m pip install --find-links /wheels/ <whatever>
 ./build.sh <module><module_version>-py<python_version>-<arch>
 ```
 
-Everything except `./build.sh <module>` is optional. `<module>` can inclue an `-openssl` or `-libressl` suffix, where relevant.
+Everything except `./build.sh <module>` is optional. `<module>` can include an `-openssl` or `-libressl` suffix, where relevant.
 
-If no `<module_version>` is provided the latest version from PyPi will be built. If `<python_version>` is omitted a default set in `build.conf` will be used. If no `<arch>` is specified all possible architectures will be built.
+If no `<module_version>` is provided the latest version from PyPi will be built. If `<python_version>` is omitted the latest version from the Docker Hub official Python repo will be used. If no `<arch>` is specified all possible architectures will be built.
 
 The build script uses environment variables to determine some behaviour, particularly in regards to what it pushes and pulls to and from Docker Hub. They're not named consistently, may change without warning as the build system evolves and you may have to look at the code (predominantly in `build.conf` and `hooks/`) to see exactly what they do. They include: `DO_PUSH`, `NO_SELF_PULL`, `WHEELS_FORCE_PULL`, `NOOP`, `NO_BUILD` and `NOPUSH`
 
-### Adding new wheels
+The default behaviour is to build modules, output wheels into `wheels/` on the host and _not_ push any images to Docker Hub.
 
+### Adding new wheels
 The build system should generally be able to build any wheel requested with the appropriately formed image tag.
 
-By default the wheel is built by: `python3 -m pip wheel -w "${WHEELS_DIR}" "${MODULE_NAME}==${MODULE_VERSION}"`
+By default the wheel is built in the Docker container by: `python3 -m pip wheel -w "${WHEELS_DIR}" "${MODULE_NAME}==${MODULE_VERSION}"`
 
 Anything beyond the default build setup that needs to be configured for a particular wheel can be dealt with in an optional `scripts/<module_name>.sh` file (matching `<module_name>` in the image tag). This is the appropriate place to install any build dependencies that Python/pip won't (such as via `apk`, `make` or `wget`). This file, if present, is sourced immediately before the `pip wheel` command in the Dockerfile.
 
-The default `pip wheel` command can be overriden by putting a custom command in the `scripts/<module_name>.sh` file and setting `WHEEL_BUILT_IN_SCRIPT` to prevent the default command executing.
+The `pip wheel` command can be overridden by putting a custom command in the `scripts/<module_name>.sh` file and setting `WHEEL_BUILT_IN_SCRIPT` to prevent the default command executing.
 
 ## Links
 
-GitHub: https://github.com/moonbuggy/docker-python-musl-wheels
+GitHub: <https://github.com/moonbuggy/docker-python-musl-wheels>
 
-Docker Hub: https://hub.docker.com/r/moonbuggy2000/python-musl-wheels
+Docker Hub: <https://hub.docker.com/r/moonbuggy2000/python-musl-wheels>

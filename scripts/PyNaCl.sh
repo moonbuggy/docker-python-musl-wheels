@@ -5,5 +5,6 @@ mod_depends () {
 }
 
 mod_build () {
-	export LIBSODIUM_MAKE_ARGS="-j$(nproc)"
+	LIBSODIUM_MAKE_ARGS="-j$(nproc)"
+	export LIBSODIUM_MAKE_ARGS
 }

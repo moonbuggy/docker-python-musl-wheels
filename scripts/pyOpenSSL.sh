@@ -1,7 +1,6 @@
 #!/bin/sh
 
 mod_depends () {
-	local depends
 	depends="cryptography-${SSL_LIBRARY}"
 	[ "${PYTHON_MAJOR}" = '2' ] && depends="${depends}3.3.2" 
 
