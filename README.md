@@ -77,7 +77,6 @@ Anything beyond the default build setup that needs to be configured for a partic
 The `pip wheel` command can be overridden by putting a custom command in the `scripts/<module_name>.sh` file and setting `WHEEL_BUILT_IN_SCRIPT` to prevent the default command executing.
 
 ## Links
-
 GitHub: <https://github.com/moonbuggy/docker-python-musl-wheels>
 
 Docker Hub: <https://hub.docker.com/r/moonbuggy2000/python-musl-wheels>
