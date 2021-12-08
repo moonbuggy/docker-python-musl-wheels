@@ -3,3 +3,4 @@ __pycache__
 .imports
 lint.sh
 .qemu_static
+_dummyfile
