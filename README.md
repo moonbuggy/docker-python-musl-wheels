@@ -3,12 +3,14 @@ Many Python modules don't currently have pre-built musl wheels, particularly for
 
 This repo generates Docker images containing wheel files for the module, python version and architecture specified by the image tag. These images are intended to be used as part of a multi-stage build, providing pre-built wheels to a Python stage. The images contain wheels for the module in the tag and any dependencies.
 
+The built wheels are processed by [pypa/auditwheel](https://github.com/pypa/auditwheel) and should meet the relevant [PEP 656](https://www.python.org/dev/peps/pep-0656/) specifications. Relevant shared libraries should be bundled into the wheel.
+
+Wheel images are currently built with musl 1.2, although some musl 1.1 wheels are available in `wheels/`.
+
 **Note:** These are primarily intended for use in my own Docker images, to avoid having to compile modules every time I make a cache-breaking change to a container that uses them. This won't be a comprehensive collection of wheels.
 
 ## Usage
-There's a bunch of wheel files in the `wheels/` directory in this repo which can be used directly. The file names may or may not conform to the relevant PEP standard, but they're whatever `wheel` spits out and `pip` seems able to install them if they go back into whatever container architecture they came out of.
-
-Otherwise the Docker images can be pulled as part of another image's build process.
+There's a bunch of wheel files in the `wheels/` directory in this repo which can be used directly. Otherwise the Docker images can be pulled as part of another image's build process.
 
 The wheel files in `wheels/` should be OpenSSL builds (for modules that use an SSL library) by default, LibreSSL builds are available via the Docker images/tags.
 
@@ -36,7 +38,7 @@ FROM "moonbuggy2000/python-musl-wheels:cryptography3.4.6-py${PYTHON_VERSION}-arm
 FROM "moonbuggy2000/python-musl-wheels:some-other-module1.0.0-py${PYTHON_VERSION}-armv7" as mod_some_other
 
 # build Python app image
-FROM "python:${PYTHON_VERSION}"
+FROM "arm32v7/python:${PYTHON_VERSION}"
 
 WORKDIR "/wheels"
 
@@ -61,7 +63,7 @@ RUN python3 -m pip install --find-links /wheels/ <whatever>
 
 Everything except `./build.sh <module>` is optional. `<module>` can include an `-openssl` or `-libressl` suffix, where relevant.
 
-If no `<module_version>` is provided the latest version from PyPi will be built. If `<python_version>` is omitted the latest version from the Docker Hub official Python repo will be used. If no `<arch>` is specified all possible architectures will be built.
+If no `<module_version>` is provided the latest version from PyPi will be built. If `<python_version>` is omitted the latest version from the Docker Hub [official Python repo](https://hub.docker.com/_/python) will be used. If no `<arch>` is specified all possible architectures will be built.
 
 The build script uses environment variables to determine some behaviour, particularly in regards to what it pushes and pulls to and from Docker Hub. They're not named consistently, may change without warning as the build system evolves and you may have to look at the code (predominantly in `build.conf` and `hooks/`) to see exactly what they do. They include: `DO_PUSH`, `NO_SELF_PULL`, `WHEELS_FORCE_PULL`, `NOOP`, `NO_BUILD` and `NOPUSH`
 
@@ -74,7 +76,7 @@ By default the wheel is built in the Docker container by: `python3 -m pip wheel 
 
 Anything beyond the default build setup that needs to be configured for a particular wheel can be dealt with in an optional `scripts/<module_name>.sh` file (matching `<module_name>` in the image tag). This is the appropriate place to install any build dependencies that Python/pip won't (such as via `apk`, `make` or `wget`). This file, if present, is sourced immediately before the `pip wheel` command in the Dockerfile.
 
-The `pip wheel` command can be overridden by putting a custom command in the `scripts/<module_name>.sh` file and setting `WHEEL_BUILT_IN_SCRIPT` to prevent the default command executing.
+The `pip wheel` command in the Dockerfile can be overridden by putting a custom command in the `scripts/<module_name>.sh` file and setting `WHEEL_BUILT_IN_SCRIPT` to prevent the default command executing.
 
 ## Links
 GitHub: <https://github.com/moonbuggy/docker-python-musl-wheels>

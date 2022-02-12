@@ -5,8 +5,6 @@ ARG FROM_IMAGE="python:${BUILD_PYTHON_VERSION}-alpine"
 
 ARG WHEELS_DIR="/wheels"
 
-#ARG DEFAULT_MODULES="cffi pycparser setuptools-rust toml"
-
 ARG TARGET_ARCH_TAG
 
 ## build the wheel
@@ -27,11 +25,13 @@ RUN apk add \
 		libffi-dev \
 		make \
 		musl-dev \
+		musl-utils \
+		patchelf \
 #		python"${BUILD_PYTHON_VERSION%%.*}"-dev \
 		rust
 
 # version check in case we accidentally upgraded Python along the way
-RUN _pyver="$(python --version | sed -En 's|Python\s+([0-9.]*)|\1|p' | awk -F \. '{print $1"."$2}')" \
+RUN _pyver="$(python --version 2>&1 | sed -En 's|Python\s+([0-9.]*)|\1|p' | awk -F \. '{print $1"."$2}')" \
 	&& if [ "x${_pyver}" != "x${BUILD_PYTHON_VERSION}" ]; then \
 		echo "ERROR: Python reports version ${_pyver}, doesn't match build version ${BUILD_PYTHON_VERSION}"; \
 		echo "Exiting"; exit 1; fi
@@ -56,14 +56,22 @@ COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
 # activate virtual env
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
-ARG DEFAULT_MODULES="cffi pycparser toml"
-RUN python -m pip install --only-binary=:all: --find-links "/${IMPORTS_DIR}/" ${DEFAULT_MODULES} \
-	|| python -m pip install --find-links "/${IMPORTS_DIR}/" ${DEFAULT_MODULES}
+# install default modules that most builds will want
+# first try installing all at once, if that fails try one at a time
+# this combination should be the quickest, as one at a time is slow but if we
+# try to do all at once from PyPi (when all at once from IMPORTS_DIR fails) it
+# seems to install everything from PyPi and ignore the importable wheels
+ARG DEFAULT_MODULES="auditwheel cffi pycparser toml"
+RUN python -m pip install --no-index --find-links "/${IMPORTS_DIR}/" ${DEFAULT_MODULES} \
+	|| for module in ${DEFAULT_MODULES}; do \
+			echo "Installing ${module}.." \
+			&& python -m pip install --find-links "/${IMPORTS_DIR}/" "${module}"; done
 
 ARG MODULE_NAME
 ARG MODULE_VERSION
 ARG SSL_LIBRARY="openssl"
 ARG WHEELS_DIR
+ARG WHEELS_TEMP_DIR="/temp-wheels"
 
 ENV	MODULE_NAME="${MODULE_NAME}" \
 		MODULE_VERSION="${MODULE_VERSION}" \
@@ -73,11 +81,33 @@ ENV	MODULE_NAME="${MODULE_NAME}" \
 
 COPY _dummyfile "scripts/${MODULE_SCRIPT}*" ./
 
-RUN echo "Building ${MODULE_NAME}==${MODULE_VERSION}.." \
-	&& if [ ! -f "${MODULE_SCRIPT}" ]; then true; else \
-		. "${MODULE_SCRIPT}" && mod_build; fi \
+ARG NO_BINARY
+# build wheels and place in WHEELS_TEMP_DIR, we'll move them later with auditwheel
+RUN if [ "x${SSL_LIBRARY}" != "xopenssl" ]; then NO_BINARY=1; fi \
+	&& echo "Building ${MODULE_NAME}==${MODULE_VERSION}.." \
+	&& if [ ! -f "${MODULE_SCRIPT}" ]; then true; \
+		else . "${MODULE_SCRIPT}" && mod_build; fi \
 	&& [ ! -z "${WHEEL_BUILT_IN_SCRIPT+set}" ] \
-		|| python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_DIR}" "${MODULE_NAME}==${MODULE_VERSION}"
+		|| python -m pip wheel --no-index --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" "${MODULE_NAME}==${MODULE_VERSION}" \
+		|| if [ ! -z "${NO_BINARY}" ]; then \
+				python -m pip wheel --no-binary="${MODULE_NAME}" --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" "${MODULE_NAME}==${MODULE_VERSION}"; \
+			else \
+				python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" "${MODULE_NAME}==${MODULE_VERSION}"; \
+			fi
+
+# auditwheel renames the wheels for musllinux, if appropriate
+# move wheels into WHEELS_DIR manually if it doesn't process them
+RUN mkdir -p "${WHEELS_DIR}" \
+	&& WHEEL_FILES="$(ls ${WHEELS_TEMP_DIR}/*)" \
+	&& for wheel_file in ${WHEEL_FILES}; do \
+		case "${wheel_file}" in \
+			*"musllinux"*|*"none-any"*) \
+				mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
+			*) \
+				auditwheel repair -w "${WHEELS_DIR}" "${wheel_file}" \
+					|| mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
+		esac; done
+
 
 ## collect the wheels
 #
