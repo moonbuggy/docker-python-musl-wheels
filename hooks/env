@@ -2,14 +2,14 @@
 # shellcheck disable=SC2034
 
 MANIFEST_TOOL_REPO="estesp/manifest-tool"
-MUSL_WHEEL_REPO="moonbuggy2000/python-musl-wheels"
+WHEEL_REPO="${WHEEL_REPO:-moonbuggy2000/python-alpine-wheels}"
 
 DATA_DIR='.build_data'
 QEMU_DIR='.qemu_static'
 IMPORTS_DIR='.imports'
 
 ARCH_YAML='arch.yaml'
-CONFIG_YAML="${DATA_DIR}/config.${DOCKER_TAG}.yaml"
+CONFIG_YAML="${DATA_DIR}/config.${DOCKER_TAG}${CONFIG_SUFFIX}.yaml"
 
 #BUILD_PLATFORM_ARG='true'
 
@@ -104,7 +104,7 @@ pypi_api_versions () { pypi_api_data "${1}" | grep -oP "(?<=${1}-)[0-9.]{4,}(?=.
 pypi_api_latest_version () { pypi_api_versions "${1}" | tail -n1; }
 
 # py_musl_wheel_XXXX <wheel string>
-py_musl_wheel_versions () { docker_api_repo_tags "${MUSL_WHEEL_REPO}" | grep -oP "${1}\K([0-9.]+)(?=-py)" | sort -uV; }
+py_musl_wheel_versions () { docker_api_repo_tags "${WHEEL_REPO}" | grep -oP "${1}\K([0-9.]+)(?=-py)" | sort -uV; }
 py_musl_wheel_latest () { py_musl_wheel_versions "${1}" | tail -n1; }
 
 #
@@ -150,7 +150,7 @@ py_required_version () {
 	esac
 
 	[ -n "${requirements}" ] \
-		&& modstring="$(echo "${requirements}" | xargs -n1 | grep -P "^#?${modname}\W")" \
+		&& modstring="$(echo "${requirements}" | xargs -n1 | grep -P "^${modname}\W")" \
 		&& modsign="$(echo "${modstring}" | grep -oP "([<>=])(?==)")"
 
 	[ -n "${modsign}" ] && [ "x${modsign}" = "x>" ] \
@@ -221,11 +221,11 @@ python_get_module_from_string () {
 	# don't catch integers that may be part of the module name
 	mod_ver="$(echo ${mod_namever} | grep -oP '([0-9.]*)$')"
 
-	# by default, if no version is supplied, get the latest version from MUSL_WHEEL_REPO
+	# by default, if no version is supplied, get the latest version from WHEEL_REPO
 	# if it exists in that repo and use PyPi if it doesn't
-	# set NO_MUSL_WHEEL_REPO to use only PyPi
-	[ -z "${NO_MUSL_WHEEL_REPO}" ] && [ -z "${mod_ver}" ] \
-		&& mod_ver="$(docker_api_repo_tags "${MUSL_WHEEL_REPO}" | \
+	# set NO_WHEEL_REPO to use only PyPi
+	[ -z "${NO_WHEEL_REPO}" ] && [ -z "${mod_ver}" ] \
+		&& mod_ver="$(docker_api_repo_tags "${WHEEL_REPO}" | \
 			grep -oP "(?<=${mod_longname})[0-9.]+(?=-py${mod_pyver})" | sort -uV | tail -n1)"
 	[ -z "${mod_ver}" ] \
 		&& mod_ver="$(pypi_api_latest_version "${mod_name}")"

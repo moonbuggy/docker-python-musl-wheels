@@ -97,16 +97,22 @@ RUN if [ "x${SSL_LIBRARY}" != "xopenssl" ]; then NO_BINARY=1; fi \
 
 # auditwheel renames the wheels for musllinux, if appropriate
 # move wheels into WHEELS_DIR manually if it doesn't process them
+ARG NO_AUDITWHEEL
 RUN mkdir -p "${WHEELS_DIR}" \
-	&& WHEEL_FILES="$(ls ${WHEELS_TEMP_DIR}/*)" \
-	&& for wheel_file in ${WHEEL_FILES}; do \
+	&& if [ -z "${NO_AUDITWHEEL}" ]; then \
+		WHEEL_FILES="$(ls ${WHEELS_TEMP_DIR}/*)"; \
+		for wheel_file in ${WHEEL_FILES}; do \
 		case "${wheel_file}" in \
 			*"musllinux"*|*"none-any"*) \
 				mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
 			*) \
 				auditwheel repair -w "${WHEELS_DIR}" "${wheel_file}" \
 					|| mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
-		esac; done
+		esac; done; \
+		else \
+			echo "Not running auditwheel."; \
+			mv "${WHEELS_TEMP_DIR}"/* "${WHEELS_DIR}"; \
+		fi
 
 
 ## collect the wheels
