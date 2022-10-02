@@ -5,7 +5,7 @@ mod_depends () {
 }
 
 mod_build () {
-	RUST_REQUIRED="1.41.1"
+	RUST_REQUIRED="1.48.0"
 	RUST_VERSION="$(rustc --version | cut -d' ' -f2)"
 
 	echo "Rust required: ${RUST_REQUIRED}"

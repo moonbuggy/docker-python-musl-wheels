@@ -73,11 +73,11 @@ ARG SSL_LIBRARY="openssl"
 ARG WHEELS_DIR
 ARG WHEELS_TEMP_DIR="/temp-wheels"
 
-ENV	MODULE_NAME="${MODULE_NAME}" \
-		MODULE_VERSION="${MODULE_VERSION}" \
-		MODULE_SCRIPT="${MODULE_NAME}.sh" \
-		WHEELS_DIR="${WHEELS_DIR}" \
-		SSL_LIBRARY="${SSL_LIBRARY}"
+ENV MODULE_NAME="${MODULE_NAME}" \
+	MODULE_VERSION="${MODULE_VERSION}" \
+	MODULE_SCRIPT="${MODULE_NAME}.sh" \
+	WHEELS_DIR="${WHEELS_DIR}" \
+	SSL_LIBRARY="${SSL_LIBRARY}"
 
 COPY _dummyfile "scripts/${MODULE_SCRIPT}*" ./
 
@@ -102,17 +102,17 @@ RUN mkdir -p "${WHEELS_DIR}" \
 	&& if [ -z "${NO_AUDITWHEEL}" ]; then \
 		WHEEL_FILES="$(ls ${WHEELS_TEMP_DIR}/*)"; \
 		for wheel_file in ${WHEEL_FILES}; do \
-		case "${wheel_file}" in \
-			*"musllinux"*|*"none-any"*) \
-				mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
-			*) \
-				auditwheel repair -w "${WHEELS_DIR}" "${wheel_file}" \
+			case "${wheel_file}" in \
+				*"musllinux"*|*"none-any"*) \
+					mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
+				*) \
+					auditwheel repair -w "${WHEELS_DIR}" "${wheel_file}" \
 					|| mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
-		esac; done; \
-		else \
-			echo "Not running auditwheel."; \
-			mv "${WHEELS_TEMP_DIR}"/* "${WHEELS_DIR}"; \
-		fi
+			esac; done; \
+	else \
+		echo "Not running auditwheel."; \
+		mv "${WHEELS_TEMP_DIR}"/* "${WHEELS_DIR}"; \
+	fi
 
 
 ## collect the wheels
