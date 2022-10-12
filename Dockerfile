@@ -1,3 +1,5 @@
+# syntax = docker/dockerfile:1.4.0
+
 ARG BUILD_PYTHON_VERSION="3.8"
 ARG FROM_IMAGE="python:${BUILD_PYTHON_VERSION}-alpine"
 
@@ -44,7 +46,7 @@ ENV	VIRTUAL_ENV="${BUILDER_ROOT}/venv" \
 		PYTHONDONTWRITEBYTECODE="1" \
 		MAKEFLAGS="-j$(nproc)"
 
-RUN python -m pip install --upgrade virtualenv
+RUN python -m pip install --upgrade pip virtualenv
 
 RUN python -m virtualenv --download "${VIRTUAL_ENV}"
 

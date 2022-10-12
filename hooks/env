@@ -340,7 +340,7 @@ docker_api_get_repo () {
 	local repo && repo="${1}"
 	[[ "${repo}" != *"/"* ]] && repo="library/${repo}"
 
-	URL="https://registry.hub.docker.com/v2/repositories/${repo}/tags?page_size=100"
+	URL="https://registry.hub.docker.com/v2/repositories/${repo}/tags?page_size=1000"
 	while [ -n "${URL}" ]; do
 #		>&2 echo "Getting: ${URL}"
 		page="$(get_url "${URL}")"
@@ -479,7 +479,7 @@ get_manifest() {
 
 	manifest_file="${DATA_DIR}/manifest.${source_repo//\//_}.${source_image##*:}"
 
-	tput civis
+	>&2 tput civis
 
 	if [ ! -f "${manifest_file}" ] || [ "$(( $(date +"%s") - $(date -r "${manifest_file}" +"%s") ))" -gt "${CACHE_EXPIRY}" ]; then
 		>&2 printf 'Fetching manifest: %s..           \b\b\b\b\b\b\b\b\b\b' "${source_image}"
@@ -523,7 +523,7 @@ get_manifest() {
 	# else
 	# 	>&2 printf 'Using cached manifest: %s\n' "${manifest_file}"
 	fi
-	tput cnorm
+	>&2 tput cnorm
 	echo "${manifest_file}"
 }
 

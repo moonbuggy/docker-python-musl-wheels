@@ -32,6 +32,7 @@ default_python_modules='
   lxml
   misaka
   mysqlclient
+  orderedset
   paramiko-openssl
   paramiko-libressl
   psutil
