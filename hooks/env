@@ -11,6 +11,10 @@ IMPORTS_DIR='.imports'
 ARCH_YAML='arch.yaml'
 CONFIG_YAML="${CONFIG_YAML_OVERRIDE:-${DATA_DIR}/config.${DOCKER_TAG}${CONFIG_SUFFIX}.yaml}"
 
+# names of debian releases
+debian_names=('null' 'buzz' 'hamm' 'woody' 'etch' 'lenny' 'squeeze' 'wheezy' 'jessie' 'stretch' 'buster' 'bullseye' 'bookworm' 'trixie')
+
+
 #BUILD_PLATFORM_ARG='true'
 
 # 1 day
@@ -60,8 +64,8 @@ eval_param_ifn () {
 	IFS=' ' read -a command <<< "${2}"
 
 	if [ -z "${!param}" ]; then
-		[ ! -z "${DEBUG+set}" ] \
-			&& >&2 echo "eval_param_ifn command: ${command[*]}"
+		# [ ! -z "${DEBUG+set}" ] \
+		# 	&& >&2 echo "eval_param_ifn command: ${command[*]}"
 		value="$(eval "${command[*]}")"
 	else
 		# [ ! -z "${DEBUG+set}" ] \
@@ -186,8 +190,8 @@ debian_package_version () {
 	fi
 
 	# either of these works
-#	package_version="$(get_url "https://sources.debian.org/api/src/${package}/" | grep -oP "\"suites\"[^}]*${debian_release}\"[^}]*version\D*\K[0-9\.\-]*")"
-	package_version="$(get_url "https://sources.debian.org/api/src/nginx/${debian_release}/" | grep -oP 'version"\:"\K([^\"]*)' | cut -d'+' -f1)"
+	package_version="$(get_url "https://sources.debian.org/api/src/${package}/" | grep -oP "\"suites\"[^}]*${debian_release}\"[^}]*version\D*\K[0-9\.\-]*")"
+	# package_version="$(get_url "https://sources.debian.org/api/src/${package}/${debian_release}/" | grep -oP 'version"\:"\K([^\"]*)' | cut -d'+' -f1)"
 
 	echo "${package_version}"
 }
@@ -201,8 +205,11 @@ pypi_api_latest_version () { pypi_api_versions "${1}" | tail -n1; }
 py_musl_wheel_versions () { docker_api_repo_tags "${WHEEL_REPO}" | grep -oP "${1}\K([0-9.]+)(?=-py)" | sort -uV; }
 py_musl_wheel_latest () { py_musl_wheel_versions "${1}" | tail -n1; }
 
-parse_version_major () { echo "${1}" | awk -F \. '{print $1}'; }
-parse_version_minor () { echo "${1}" | awk -F \. '{print $1"."$2}'; }
+# return the 'X' for any 'X.Y.Z' versions provided as arguments
+parse_version_major () { echo "${1}" | xargs -n1 | grep -oP '(^\d*)' | sort -uV ; }
+
+# return the 'X.Y' for any 'X.Y.Z' versions provided as arguments
+parse_version_minor () { echo "${1}" | xargs -n1 | grep -oP '(^\d*\.\d*)' | sort -uV; }
 
 #
 # py_required_vesion() and python_get_module_from_string() needs a refactor,
@@ -488,10 +495,10 @@ get_manifest() {
 		# pretty_manifest_cmd="$(echo "${manifest_cmd[*]}" | sed -r -e "s/(--)/\\\ \n\t\1/g")"
 		# >&2 printf '\n--- manifest command ---\n%s\n' "${pretty_manifest_cmd}"
 
-
+		# the spinner used in this way prevents 'error' being set
 		local error
-		error="$("${manifest_cmd[@]}" 2>&1 1>"${manifest_file}")" &
-		>&2 spinner
+		error="$("${manifest_cmd[@]}" 2>&1 1>"${manifest_file}")" #&
+		# >&2 spinner
 
 		# if there's an error try and determine the cause so we can decide whether to
 		# cache the failure by keeping the empty manifest file:

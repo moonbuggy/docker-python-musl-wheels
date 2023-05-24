@@ -20,7 +20,7 @@
 core_python_modules='pycparser cffi toml'
 
 # defaults used by `all`, `update` and '*-pyall-*'
-default_python_versions='3.8 3.9 3.10'
+default_python_versions='3.8 3.9 3.10 3.11'
 default_python_modules='
   auditwheel
   cffi
@@ -32,7 +32,7 @@ default_python_modules='
   lxml
   misaka
   mysqlclient
-  orderedset
+  ordered-set
   paramiko-openssl
   paramiko-libressl
   psutil
@@ -40,29 +40,40 @@ default_python_modules='
   PyNaCl
   pyOpenSSL
   python-hosts
-  setuptools-rust'
+  setuptools-rust
+  zstandard'
 
 # don't copy binaries to the wheels/ folder of the build system
 # NO_WHEELS_OUT=1
 
-# set Docker repo and other build parameters based on whether we're bundling
-# shared libraries or not
-if [ -z "${NO_SHARED+set}" ]; then
-  DOCKER_REPO="${DOCKER_REPO:-moonbuggy2000/python-musl-wheels}"
-  CONFIG_SUFFIX=''
-else
-  DOCKER_REPO="${DOCKER_REPO:-moonbuggy2000/python-alpine-wheels}"
+prepare_no_shared () {
+  DOCKER_REPO='moonbuggy2000/python-alpine-wheels'
+  # export DOCKER_REPO
 
   # don't use auditwheel to bundle shared libraries
   NO_AUDITWHEEL=1
+  # export NO_AUDITWHEEL
 
   # append a suffix to the build config filename to distinguish it from the
   # standard auditwheel builds
   CONFIG_SUFFIX='-no-auditwheel'
+  # export CONFIG_SUFFIX
 
   # remove auditwheel from defaults
   default_python_modules="${default_python_modules//auditwheel/}"
-fi
+}
+
+prepare_with_shared () {
+  DOCKER_REPO='moonbuggy2000/python-musl-wheels'
+  CONFIG_SUFFIX=''
+}
+
+
+# set Docker repo and other build parameters based on whether we're bundling
+# shared libraries or not
+[ -z "${NO_SHARED+set}" ] \
+  && prepare_with_shared \
+  || prepare_no_shared
 
 # use the correct wheel repo in hooks/env
 WHEEL_REPO="${DOCKER_REPO}"
@@ -214,6 +225,8 @@ check_updates () {
     if [ "$(printf '%s\n' "${pypi_ver}" "${repo_ver}" | sort -V | tail -n1)" != "${repo_ver}" ]; then
       >&2 printf "%-30s %10s -> %s\n" "${mod}" "${repo_ver}" "${pypi_ver}"
       updateable+=("$(get_data ${mod} 'string')${pypi_ver}")
+    else
+      >&2 printf "%-30s %10s matched\n" "${mod}" "${pypi_ver}"
     fi
   done
   >&2 printf '\n'
@@ -256,10 +269,16 @@ case "${first_arg}" in
 
     # there won't be anything to pull if we're updating
     NO_SELF_PULL='true'
+
+    # for 'update' and 'core' we want to do both shared and non-shared version
+    BUILD_BOTH='true'
     ;;
 
   all)
     build_python_modules="$(add_pyall ${default_python_modules})"
+
+    # for 'all' we want to do both shared and non-shared version
+    BUILD_BOTH='true'
     ;;
 
   *)
@@ -318,14 +337,26 @@ done < <(echo "${build_order}")
 
 # start building groups
 #
-for group in "${groups[@]}"; do
-  printf 'Building:\n%s\n\n' "$(echo ${group} | xargs -n"${py_ver_count}")"
+build_group () {
+  printf 'Building:\n%s\n\n' "$(echo ${1} | xargs -n"${py_ver_count}")"
 
   [ ! -z "${NOOP+set}" ] \
     && printf "[NOOP]\n\n" \
-    && continue
+    && return
 
-  . hooks/.build.sh ${group}
+  . hooks/.build.sh "${1}"
+}
+
+for group in "${groups[@]}"; do
+  if [ ! -z "${BUILD_BOTH+set}" ]; then
+    prepare_with_shared
+    build_group "${group}"
+
+    prepare_no_shared
+    build_group "$(echo "${group}" | xargs -n1 | grep -vP 'auditwheel.*' | xargs)"
+  else
+    build_group "${group}"
+  fi
 done
 
 rm -rf _dummyfile >/dev/null 2>&1

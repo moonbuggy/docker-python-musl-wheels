@@ -33,7 +33,7 @@ Two different types of wheels are available:
     [moonbuggy2000/python-apline-wheels](https://hub.docker.com/r/moonbuggy2000/python-alpine-wheels)
     and wheel files will include `-linux` in the name.
 
-Wheel images are currently built in Alpine 3.15 with musl 1.2, although some
+Wheel images are currently built in Alpine 3.17 with musl 1.2, although some
 musl 1.1 wheels are available in `wheels/`.
 
 **Note:** These are primarily intended for use in my own Docker images, to avoid
@@ -63,7 +63,7 @@ moonbuggy2000/python-musl-wheels:cryptography3.4.8-py3.8-armv7
 ```
 
 #### Multi-stage build example
-```
+```dockerfile
 ARG PYTHON_VERISON="3.8"
 
 # get cryptography module
@@ -92,7 +92,7 @@ RUN python3 -m pip install --find-links /wheels/ cryptography some_other_module
 ```
 
 ## Building the Docker images
-```
+```sh
 ./build.sh <module><module_version>-py<python_version>-<arch>
 ```
 
@@ -125,6 +125,8 @@ are used by some special build arguments:
 
 These builds should be done standalone, as the sole argument to _build.sh_.
 
+These will build both types of images, with and without the shared libraries.
+
 ### Build environment
 The build script uses environment variables to determine some behaviour,
 particularly in regards to what it pushes and pulls to and from Docker Hub.
@@ -133,13 +135,15 @@ evolves and you may have to look at the code (predominantly in `build.conf` and
 `hooks/`) to see exactly what they do. They include: `DO_PUSH`, `NO_SELF_PULL`,
 `WHEELS_FORCE_PULL`, `NOOP`, `NO_BUILD` and `NO_PUSH`
 
-To build wheels without bundled libraries the `NO_SHARED` flag should be set.
+To build wheels without bundled libraries the `NO_SHARED` flag should be set
+(unless doing one of the default builds described above, where both types are
+built automatically).
 
 The default behaviour is to build wheels with bundled shared libraries, output
 wheels into `wheels/` on the host and _not_ push any images to Docker Hub.
 
 ### Build examples
-```
+```sh
 # latest cryptography, openSSL, latest Python, all arch
 ./build.sh cryptography
 # .. or ..

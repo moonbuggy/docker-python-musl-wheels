@@ -3,8 +3,6 @@
 ARG BUILD_PYTHON_VERSION="3.8"
 ARG FROM_IMAGE="python:${BUILD_PYTHON_VERSION}-alpine"
 
-#ARG PYTHON_MAJOR="3"
-
 ARG WHEELS_DIR="/wheels"
 
 ARG TARGET_ARCH_TAG
@@ -13,14 +11,9 @@ ARG TARGET_ARCH_TAG
 #
 FROM "${FROM_IMAGE}" AS builder
 
-# QEMU static binaries from pre_build
-ARG QEMU_DIR
-ARG QEMU_ARCH=""
-COPY _dummyfile "${QEMU_DIR}/qemu-${QEMU_ARCH}-static*" /usr/bin/
-
 # allow apk to cache because some module scripts may run apk
 ARG BUILD_PYTHON_VERSION
-RUN apk add \
+RUN apk -U add \
 		cargo \
 		ccache \
 		gcc \
@@ -29,8 +22,12 @@ RUN apk add \
 		musl-dev \
 		musl-utils \
 		patchelf \
-#		python"${BUILD_PYTHON_VERSION%%.*}"-dev \
 		rust
+
+# Some modules complain about the version of patchelf available in the normal repos
+# RUN apk -U add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
+# 		patchelf \
+# 		musl-dev
 
 # version check in case we accidentally upgraded Python along the way
 RUN _pyver="$(python --version 2>&1 | sed -En 's|Python\s+([0-9.]*)|\1|p' | awk -F \. '{print $1"."$2}')" \
@@ -46,7 +43,7 @@ ENV	VIRTUAL_ENV="${BUILDER_ROOT}/venv" \
 		PYTHONDONTWRITEBYTECODE="1" \
 		MAKEFLAGS="-j$(nproc)"
 
-RUN python -m pip install --upgrade pip virtualenv
+RUN python -m pip install --upgrade virtualenv
 
 RUN python -m virtualenv --download "${VIRTUAL_ENV}"
 
@@ -58,8 +55,12 @@ COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
 # activate virtual env
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
+RUN python -m pip install --upgrade pip
+
 # install default modules that most builds will want
+#
 # first try installing all at once, if that fails try one at a time
+#
 # this combination should be the quickest, as one at a time is slow but if we
 # try to do all at once from PyPi (when all at once from IMPORTS_DIR fails) it
 # seems to install everything from PyPi and ignore the importable wheels
@@ -81,7 +82,7 @@ ENV MODULE_NAME="${MODULE_NAME}" \
 	WHEELS_DIR="${WHEELS_DIR}" \
 	SSL_LIBRARY="${SSL_LIBRARY}"
 
-COPY _dummyfile "scripts/${MODULE_SCRIPT}*" ./
+COPY scripts/ ./
 
 ARG NO_BINARY
 # build wheels and place in WHEELS_TEMP_DIR, we'll move them later with auditwheel
