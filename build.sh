@@ -46,34 +46,34 @@ default_python_modules='
 # don't copy binaries to the wheels/ folder of the build system
 # NO_WHEELS_OUT=1
 
+# set Docker repo and other build parameters based on whether we're bundling
+# shared libraries or not
 prepare_no_shared () {
   DOCKER_REPO='moonbuggy2000/python-alpine-wheels'
-  # export DOCKER_REPO
 
   # don't use auditwheel to bundle shared libraries
   NO_AUDITWHEEL=1
-  # export NO_AUDITWHEEL
 
   # append a suffix to the build config filename to distinguish it from the
   # standard auditwheel builds
   CONFIG_SUFFIX='-no-auditwheel'
-  # export CONFIG_SUFFIX
 
   # remove auditwheel from defaults
   default_python_modules="${default_python_modules//auditwheel/}"
+
+  NO_SHARED=1
 }
 
 prepare_with_shared () {
-  DOCKER_REPO='moonbuggy2000/python-musl-wheels'
+  DOCKER_REPO="moonbuggy2000/python-musl-wheels"
   CONFIG_SUFFIX=''
+
+  unset NO_SHARED
 }
 
-
-# set Docker repo and other build parameters based on whether we're bundling
-# shared libraries or not
-[ -z "${NO_SHARED+set}" ] \
-  && prepare_with_shared \
-  || prepare_no_shared
+[ ! -z "${NO_SHARED}" ] \
+  && prepare_no_shared \
+  || prepare_with_shared
 
 # use the correct wheel repo in hooks/env
 WHEEL_REPO="${DOCKER_REPO}"
@@ -87,7 +87,7 @@ CACHE_EXPIRY=86400
 
 log_debug () { [ ! -z "${DEBUG}" ] && >&2 printf "$*\n"; }
 
-# make the module name safe to be used as an array name
+# make a module name safe to be used as an array name
 safeString () { echo $1 | sed -E 's/\W//g' | tr '[:upper:]' '[:lower:]'; }
 
 print_array () {
@@ -247,7 +247,7 @@ py_ver_latest="$(echo ${default_python_versions} | xargs -n1 | sort -uV | tail -
 #
 case "${first_arg}" in
   check|core|update|updates)
-    [ -z "${first_arg//default/}" ] \
+    [ -z "${first_arg//core/}" ] \
       && default_mods="${core_python_modules}" \
       || default_mods="${default_python_modules}"
 
@@ -268,6 +268,12 @@ case "${first_arg}" in
     build_python_modules="$(add_pyall ${updateable_modules})"
 
     # there won't be anything to pull if we're updating
+    #
+    # but disabling self-pulling means we won't use existing local images if an
+    # update is aborted and re-started, forcing a rebuild from scratch
+    #
+    # however, the Docker build cache should compensate for this so it's not
+    # really all the way from scratch
     NO_SELF_PULL='true'
 
     # for 'update' and 'core' we want to do both shared and non-shared version
@@ -303,13 +309,13 @@ done
 
 # get build order from topological sort
 #
+printf '\nGetting build order..\n'
 build_order=$(docker run --rm -ti moonbuggy2000/python-dependency-groups ${topo_names})
 
-printf '\nGetting build order..\n'
-i=1; while read -r line; do
-  printf '%3s: %s\n' "$((i++))" "${line}"
-done < <(echo "${build_order}")
-printf '\n'
+# i=1; while read -r line; do
+#   printf '%3s: %s\n' "$((i++))" "${line}"
+# done < <(echo "${build_order}")
+# printf '\n'
 
 # match modules in the build order with full module strings
 #
@@ -337,25 +343,23 @@ done < <(echo "${build_order}")
 
 # start building groups
 #
-build_group () {
-  printf 'Building:\n%s\n\n' "$(echo ${1} | xargs -n"${py_ver_count}")"
-
-  [ ! -z "${NOOP+set}" ] \
-    && printf "[NOOP]\n\n" \
-    && return
-
-  . hooks/.build.sh "${1}"
-}
-
 for group in "${groups[@]}"; do
-  if [ ! -z "${BUILD_BOTH+set}" ]; then
+  printf 'Building:\n%s\n\n' "$(echo ${group} | xargs -n"${py_ver_count}")"
+
+  # [ ! -z "${NOOP+set}" ] \
+  #   && printf "[NOOP]\n\n" \
+  #   && continue
+
+  if [ ! -z "${BUILD_BOTH}" ]; then
+    printf 'Building both with and without shared libraries.\n\n'
+
     prepare_with_shared
-    build_group "${group}"
+    . hooks/.build.sh ${group}
 
     prepare_no_shared
-    build_group "$(echo "${group}" | xargs -n1 | grep -vP 'auditwheel.*' | xargs)"
+    . hooks/.build.sh ${group}
   else
-    build_group "${group}"
+    . hooks/.build.sh ${group}
   fi
 done
 

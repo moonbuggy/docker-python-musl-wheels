@@ -9,7 +9,7 @@ ARG TARGET_ARCH_TAG
 
 ## build the wheel
 #
-FROM "${FROM_IMAGE}" AS builder
+FROM --platform="${TARGETPLATFORM}" "${FROM_IMAGE}" AS builder
 
 # allow apk to cache because some module scripts may run apk
 ARG BUILD_PYTHON_VERSION
@@ -17,6 +17,7 @@ RUN apk -U add \
 		cargo \
 		ccache \
 		gcc \
+		git \
 		libffi-dev \
 		make \
 		musl-dev \
@@ -38,24 +39,27 @@ RUN _pyver="$(python --version 2>&1 | sed -En 's|Python\s+([0-9.]*)|\1|p' | awk 
 ARG BUILDER_ROOT="/builder-root"
 WORKDIR "${BUILDER_ROOT}"
 
+# CARGO_NET_GIT_FETCH_WITH_CLI overcomes an 'Unable to update registry
+#	`crates-io`' error that appears in some builds for some architectures
 ENV	VIRTUAL_ENV="${BUILDER_ROOT}/venv" \
 		PYTHONUNBUFFERED="1" \
 		PYTHONDONTWRITEBYTECODE="1" \
-		MAKEFLAGS="-j$(nproc)"
+		MAKEFLAGS="-j$(nproc)" \
+		CARGO_NET_GIT_FETCH_WITH_CLI="true"
 
 RUN python -m pip install --upgrade virtualenv
 
 RUN python -m virtualenv --download "${VIRTUAL_ENV}"
 
-# Python wheels from pre_build
-ARG IMPORTS_DIR=""
-ARG TARGET_ARCH_TAG=""
-COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
-
 # activate virtual env
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 RUN python -m pip install --upgrade pip
+
+# Python wheels from pre_build
+ARG IMPORTS_DIR=""
+ARG TARGET_ARCH_TAG=""
+COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
 
 # install default modules that most builds will want
 #
@@ -85,6 +89,7 @@ ENV MODULE_NAME="${MODULE_NAME}" \
 COPY scripts/ ./
 
 ARG NO_BINARY
+ARG QEMU_ARCH=""
 # build wheels and place in WHEELS_TEMP_DIR, we'll move them later with auditwheel
 RUN if [ "x${SSL_LIBRARY}" != "xopenssl" ]; then NO_BINARY=1; fi \
 	&& echo "Building ${MODULE_NAME}==${MODULE_VERSION}.." \

@@ -123,21 +123,27 @@ are used by some special build arguments:
 *   `update`  - as with `check` but continue and build for all default Python
     versions
 
-These builds should be done standalone, as the sole argument to _build.sh_.
-
-These will build both types of images, with and without the shared libraries.
+These builds should be done standalone, as the sole argument to _build.sh_. They
+will build wheels both with and without shared libraries.
 
 ### Build environment
 The build script uses environment variables to determine some behaviour,
 particularly in regards to what it pushes and pulls to and from Docker Hub.
-They're not named consistently, may change without warning as the build system
-evolves and you may have to look at the code (predominantly in `build.conf` and
-`hooks/`) to see exactly what they do. They include: `DO_PUSH`, `NO_SELF_PULL`,
-`WHEELS_FORCE_PULL`, `NOOP`, `NO_BUILD` and `NO_PUSH`
 
-To build wheels without bundled libraries the `NO_SHARED` flag should be set
-(unless doing one of the default builds described above, where both types are
-built automatically).
+The most useful environmental variables are:
+
+| variable | default | description |
+| --- | --- | --- |
+| DO_PUSH | false | push images to Docker Hub |
+| NO_BUILD | false | skip the Docker build stage |
+| NOOP | false | dry run, no building or pushing |
+| NO_SELF_PULL | false | don't pull existing matching wheel from Docker Hub or locally |
+| WHEELS_FORCE_PULL | false | pull existing matching wheel from Ducker Hub, even if it exists locally |
+| NO_SHARED | false | build wheels without shared libraries |
+| BUILD_BOTH | false | build both types of wheels, with and without shared libraries |
+
+They're currently not named in the most clear and consistent manner and so may
+change in future, if/when I get around to cleaning things up a little bit.
 
 The default behaviour is to build wheels with bundled shared libraries, output
 wheels into `wheels/` on the host and _not_ push any images to Docker Hub.
@@ -165,8 +171,9 @@ NO_SHARED=1 ./build.sh cryptography-openssl36.0.1-pyall-amd64
 ./build.sh cryptography-openssl-py3.9 cffi1.15.1-armv7 pycparser toml-pyall
 
 # all default modules, all default python versions, all arch, all at once
-# force building from source and push to Docker registry
-NO_SELF_PULL=1 DO_PUSH=1 ./build.sh all
+# force building from source, build both with and without shared libraries
+# and push to Docker registry
+NO_SELF_PULL=1 BUILD_BOTH=1 DO_PUSH=1 ./build.sh all
 ```
 
 ### Adding new wheels
