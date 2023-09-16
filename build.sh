@@ -155,9 +155,11 @@ add_module () {
   this_mod[arch]="$(echo ${this_mod[string]} \
     | grep -oP '(amd64|arm64v8|armv6|armv7|i386|ppc64le|riscv64|s390x)$')"
 
+  local no_arch="${this_mod[string]%-${this_mod[arch]}}"
+
   this_mod[py_ver]="$(echo ${this_mod[string]} | grep -oP '\-py\K[^(\-|$)]*')"
 
-  local name_ver="${this_mod[string]%-py${this_mod[py_ver]}*}"
+  local name_ver="${no_arch%-py${this_mod[py_ver]}*}"
 
   this_mod[ver]="$(echo ${name_ver} | grep -oP '[0-9.]*$')"
 
@@ -194,14 +196,25 @@ add_pyall () {
 # new version is available
 #
 check_updates () {
-  >&2 printf 'Checking for available module updates..\n'
+  >&2 printf 'Checking for available module updates'
 
-  eval_param_ifn REPO_TAGS "docker_api_repo_tags ${DOCKER_REPO}"
+  # check if we're cleaning the cache
+  [[ ${CLEAN_CACHE} -ne 0 ]] \
+    && >&2 printf ' (NO CACHE)' \
+    && CACHE_EXPIRY=0
+
+  >&2 echo '..'
+
+  # we want to evaluate this on every run, otherwise CACHE_EXPIRY is bypassed
+  # since we juat read from the .build_data config file and don't ever call
+  # docker_api_repo_tags()
+  eval_param REPO_TAGS "docker_api_repo_tags ${DOCKER_REPO}"
 
   local updateable=()
 
   for mod in ${*:-$default_python_modules}; do
     add_module ${mod}
+
     local mod_name
     mod_name="$(get_data ${mod} 'name')"
 
@@ -211,14 +224,16 @@ check_updates () {
     local temp_val
     temp_var="${safeMod}_pypi_ver"
     pypi_ver="${!temp_var}"
-    [ -z "${pypi_ver}" ] \
-      && pypi_ver="$(pypi_api_latest_version ${mod_name})"
+    if [ -z "${pypi_ver}" ] || [[ ${CLEAN_CACHE} -ne 0 ]]; then
+      pypi_ver="$(pypi_api_latest_version ${mod_name})"
+    fi
     add_param "${pypi_ver}" "${temp_var}"
 
     temp_var="${safeMod}_repo_ver"
     repo_ver="${!temp_var}"
-    [ -z "${repo_ver}" ] \
-      && repo_ver="$(search_repo_tags "${mod_name}" "${REPO_TAGS}")"
+    if [ -z "${repo_ver}" ] || [[ ${CLEAN_CACHE} -ne 0 ]]; then
+      repo_ver="$(search_repo_tags "${mod_name}" "${REPO_TAGS}")"
+    fi
     repo_ver="${repo_ver//${mod}/}"
     add_param "${repo_ver}" "${temp_var}"
 

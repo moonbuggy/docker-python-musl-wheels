@@ -126,6 +126,10 @@ are used by some special build arguments:
 These builds should be done standalone, as the sole argument to _build.sh_. They
 will build wheels both with and without shared libraries.
 
+Data from remote repositories is cached locally for 24 hours, so the output from
+`check` won't change immediately after building and pushing modules. Use
+`CLEAN_CACHE` (see below) to bypass the cache if necessary.
+
 ### Build environment
 The build script uses environment variables to determine some behaviour,
 particularly in regards to what it pushes and pulls to and from Docker Hub.
@@ -141,6 +145,7 @@ The most useful environmental variables are:
 | WHEELS_FORCE_PULL | false | pull existing matching wheel from Ducker Hub, even if it exists locally |
 | NO_SHARED | false | build wheels without shared libraries |
 | BUILD_BOTH | false | build both types of wheels, with and without shared libraries |
+| CLEAN_CACHE | false | clear the local cache and pull fresh data for _all_/_core_/_check_/_update_ |
 
 They're currently not named in the most clear and consistent manner and so may
 change in future, if/when I get around to cleaning things up a little bit.

@@ -9,7 +9,7 @@ ARG TARGET_ARCH_TAG
 
 ## build the wheel
 #
-FROM --platform="${TARGETPLATFORM}" "${FROM_IMAGE}" AS builder
+FROM "${FROM_IMAGE}" AS builder
 
 # allow apk to cache because some module scripts may run apk
 ARG BUILD_PYTHON_VERSION
@@ -126,7 +126,7 @@ RUN mkdir -p "${WHEELS_DIR}" \
 ## collect the wheels
 #
 # results in platform that matches arch
-FROM "moonbuggy2000/scratch:${TARGET_ARCH_TAG}"
+FROM "moonbuggy2000/scratch"
 
 ARG WHEELS_DIR
 COPY --from=builder "${WHEELS_DIR}/" /
