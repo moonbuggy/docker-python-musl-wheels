@@ -36,9 +36,10 @@ Two different types of wheels are available:
 Wheel images are currently built in Alpine 3.17 with musl 1.2, although some
 musl 1.1 wheels are available in `wheels/`.
 
-**Note:** These are primarily intended for use in my own Docker images, to avoid
-having to compile modules every time I make a cache-breaking change to a Python
-image. This repo won't be a comprehensive collection of wheels.
+> [!NOTE]
+> These are primarily intended for use in my own Docker images, to avoid
+> having to compile modules every time I make a cache-breaking change to a Python
+> image. This repo won't be a comprehensive collection of wheels.
 
 ## Usage
 There's a bunch of wheel files in the `wheels/` directory in this repo which can
@@ -177,9 +178,9 @@ NO_SHARED=1 ./build.sh cryptography-openssl36.0.1-pyall-amd64
 ./build.sh cryptography-openssl-py3.9 cffi1.15.1-armv7 pycparser toml-pyall
 
 # all default modules, all default python versions, all arch, all at once
-# force building from source, build both with and without shared libraries
+# build from source, build both with and without shared libraries
 # and push to Docker registry
-NO_SELF_PULL=1 BUILD_BOTH=1 DO_PUSH=1 ./build.sh all
+DO_PUSH=1 ./build.sh all
 ```
 
 ### Adding new wheels

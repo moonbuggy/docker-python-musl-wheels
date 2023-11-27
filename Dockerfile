@@ -51,7 +51,9 @@ ENV	VIRTUAL_ENV="${BUILDER_ROOT}/venv" \
 # as well, since it uses pip for the downloading but won't take '--index-url' as
 # an argument
 ARG PYPI_INDEX="https://pypi.org/simple"
-RUN echo -e "[global]\nindex-url = ${PYPI_INDEX}\ntrusted-host = $(echo "${PYPI_INDEX}" | cut -d'/' -f3 | cut -d':' -f1)" > /etc/pip.conf
+RUN printf '%s\n' '[global]' "  index-url = ${PYPI_INDEX}" \
+	"  trusted-host = $(echo "${PYPI_INDEX}" | cut -d'/' -f3 | cut -d':' -f1)" \
+	> /etc/pip.conf
 
 RUN python -m pip install --upgrade virtualenv
 
