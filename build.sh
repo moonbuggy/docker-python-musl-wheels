@@ -20,7 +20,7 @@
 core_python_modules='pycparser cffi toml'
 
 # defaults used by `all`, `update` and '*-pyall-*'
-default_python_versions='3.8 3.9 3.10 3.11'
+default_python_versions='3.8 3.9 3.10 3.11 3.12'
 default_python_modules='
   auditwheel
   cffi
@@ -45,6 +45,10 @@ default_python_modules='
 
 # don't copy binaries to the wheels/ folder of the build system
 # NO_WHEELS_OUT=1
+
+# unset DEFAULT_MODULES here, so we don't retain the list between shared and
+# no-shared builds
+unset DEFAULT_MODULES
 
 # set Docker repo and other build parameters based on whether we're bundling
 # shared libraries or not
@@ -358,8 +362,9 @@ done < <(echo "${build_order}")
 
 # start building groups
 #
-for group in "${groups[@]}"; do
-  printf 'Building:\n%s\n\n' "$(echo ${group} | xargs -n"${py_ver_count}")"
+i=1; for group in "${groups[@]}"; do
+  printf 'Building group %s:\n-----------------\n' "$((i++))"
+  printf '%s\n\n' "$(echo ${group} | xargs -n"${py_ver_count}")"
 
   # [ ! -z "${NOOP+set}" ] \
   #   && printf "[NOOP]\n\n" \
@@ -368,9 +373,11 @@ for group in "${groups[@]}"; do
   if [ ! -z "${BUILD_BOTH}" ]; then
     printf 'Building both with and without shared libraries.\n\n'
 
+    printf 'SHARED\n------\n'
     prepare_with_shared
     . hooks/.build.sh ${group}
 
+    printf 'NO_SHARED\n---------\n'
     prepare_no_shared
     . hooks/.build.sh ${group}
   else

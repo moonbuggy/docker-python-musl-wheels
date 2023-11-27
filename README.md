@@ -114,9 +114,9 @@ _build.sh_.
 There are some default modules and Python versions built into _build.sh_ which
 are used by some special build arguments:
 
-*   `all`     - build all default modules for all default python version
+*   `all`     - build all default modules for all default python versions
 *   `core`    - build core default modules for all default python versions (this
-    is best for common dependencies other modules might use, to ensure they're
+    is best for common dependencies other modules often use, to ensure they're
     available at build time for an `all` build)
 *   `check`   - check if newer versions of default modules are available on PyPi
     then exit without starting build
@@ -142,10 +142,11 @@ The most useful environmental variables are:
 | NO_BUILD | false | skip the Docker build stage |
 | NOOP | false | dry run, no building or pushing |
 | NO_SELF_PULL | false | don't pull existing matching wheel from Docker Hub or locally |
-| WHEELS_FORCE_PULL | false | pull existing matching wheel from Ducker Hub, even if it exists locally |
+| WHEELS_FORCE_PULL | false | pull existing matching wheel from Docker Hub, even if it exists locally |
 | NO_SHARED | false | build wheels without shared libraries |
 | BUILD_BOTH | false | build both types of wheels, with and without shared libraries |
 | CLEAN_CACHE | false | clear the local cache and pull fresh data for _all_/_core_/_check_/_update_ |
+| PYPI_INDEX | https\://pypi.org/simple | index URL for pip, useful if we're running a caching proxy |
 
 They're currently not named in the most clear and consistent manner and so may
 change in future, if/when I get around to cleaning things up a little bit.

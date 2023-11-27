@@ -215,7 +215,7 @@ debian_package_version () {
 }
 
 # pypi_api_XXXX <project>
-pypi_api_data () { get_url "https://pypi.org/simple/${1}"; }
+pypi_api_data () { get_url "${PYPI_INDEX:-https://pypi.org/simple}/${1}"; }
 pypi_api_versions () { pypi_api_data "${1}" | grep -oP "(?<=${1}-)[0-9.]{4,}(?=.tar.gz)" | sort -uV; }
 pypi_api_latest_version () { pypi_api_versions "${1}" | tail -n1; }
 
