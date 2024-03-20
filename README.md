@@ -1,4 +1,19 @@
 # Python musl wheels
+Python musl wheels in Docker containers for importing into multi-stage builds.
+
+*   [Rationale](#rationale)
+*   [Wheels](#wheels)
+*   [Usage](#usage)
+    +   [Using the Docker images](#using-the-docker-images)
+        -   [Multi-stage build example](#multi-stage-build-example)
+*   [Building the wheel images](#building-the-wheel-images)
+    +   [Default builds](#default-builds)
+    +   [Build environment](#build-environment)
+    +   [Build examples](#build-examples)
+    +   [Adding new wheels](#adding-new-wheels)
+*   [Links](#links)
+
+## Rationale
 Many Python modules don't currently have pre-built musl wheels, particularly for
 non-x64 architectures. This can result in slow Python builds in Docker because
 modules with no available wheel need to be built from source when the image is.
@@ -9,6 +24,12 @@ to be used as part of a multi-stage Docker image build, providing pre-built
 wheels to a Python stage. The images contain wheels for the module in the tag
 and any dependencies.
 
+> [!NOTE]
+> These are primarily intended for use in my own Docker images, to avoid
+> having to compile modules every time I make a cache-breaking change to a Python
+> image. This repo won't be a comprehensive collection of wheels.
+
+## Wheels
 Two different types of wheels are available:
 
 *   Wheels including shared libraries
@@ -33,13 +54,20 @@ Two different types of wheels are available:
     [moonbuggy2000/python-apline-wheels](https://hub.docker.com/r/moonbuggy2000/python-alpine-wheels)
     and wheel files will include `-linux` in the name.
 
-Wheel images are currently built in Alpine 3.17 with musl 1.2, although some
+Wheel images are currently built in Alpine 3.18 with musl 1.2, although some
 musl 1.1 wheels are available in `wheels/`.
 
 > [!NOTE]
-> These are primarily intended for use in my own Docker images, to avoid
-> having to compile modules every time I make a cache-breaking change to a Python
-> image. This repo won't be a comprehensive collection of wheels.
+> In cases where there's an existing pre-built wheel for an architecture from PyPi,
+> the 'no shared libraries' images may end up using those instead of building
+> their own. As a result, particularly for `amd64` and `arm64` architectures, some
+> 'python-alpine-wheels' wheels may actually include shared libraries.
+>
+> The point of this repo is to fill the gap, while pre-built wheels from PyPi
+> become more available for more architectures. It doesn't make sense to widen
+> that gap by building wheels we don't need to. We don't save a whole lot of disk
+> space by leaving the shared libraries out, so it's difficult to justify the
+> build time.
 
 ## Usage
 There's a bunch of wheel files in the `wheels/` directory in this repo which can
@@ -92,7 +120,7 @@ RUN python3 -m pip install --find-links /wheels/ cryptography some_other_module
 # .. etcetera, or whatever ..
 ```
 
-## Building the Docker images
+## Building the wheel images
 ```sh
 ./build.sh <module><module_version>-py<python_version>-<arch>
 ```
@@ -143,7 +171,9 @@ The most useful environmental variables are:
 | NO_BUILD | false | skip the Docker build stage |
 | NOOP | false | dry run, no building or pushing |
 | NO_SELF_PULL | false | don't pull existing matching wheel from Docker Hub or locally |
+| NO_PULL_WHEELS | false | don't pull any wheels from Docker Hub or locally |
 | WHEELS_FORCE_PULL | false | pull existing matching wheel from Docker Hub, even if it exists locally |
+| BUILD_NO_CACHE | false | don't use cached layers when building |
 | NO_SHARED | false | build wheels without shared libraries |
 | BUILD_BOTH | false | build both types of wheels, with and without shared libraries |
 | CLEAN_CACHE | false | clear the local cache and pull fresh data for _all_/_core_/_check_/_update_ |
@@ -190,7 +220,7 @@ appropriately formed image tag.
 By default the wheel is built in the Docker container by: `python3 -m pip wheel
 -w "${WHEELS_DIR}" "${MODULE_NAME}==${MODULE_VERSION}"`
 
-#### _scripts/<module_name>.sh_
+##### _scripts/<module_name>.sh_
 Anything beyond the default build setup that needs to be configured for a
 particular wheel can be dealt with in an optional `scripts/<module_name>.sh`
 file (matching `<module_name>` in the image tag). This is the appropriate place

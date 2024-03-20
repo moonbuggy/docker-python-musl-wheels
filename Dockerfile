@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:1.4.0
 
 ARG BUILD_PYTHON_VERSION="3.8"
-ARG FROM_IMAGE="python:${BUILD_PYTHON_VERSION}-alpine"
+ARG FROM_IMAGE="moonbuggy2000/alpine-python-builder:${BUILD_PYTHON_VERSION}-alpine"
 
 ARG WHEELS_DIR="/wheels"
 
@@ -11,41 +11,13 @@ ARG TARGET_ARCH_TAG
 #
 FROM "${FROM_IMAGE}" AS builder
 
-# allow apk to cache because some module scripts may run apk
-ARG BUILD_PYTHON_VERSION
-RUN apk -U add \
-		cargo \
-		ccache \
-		gcc \
-		git \
-		libffi-dev \
-		make \
-		musl-dev \
-		musl-utils \
-		patchelf \
-		rust
+# do this early so we break the cache between shared/no_shred builds
+ARG NO_AUDITWHEEL=""
 
-# Some modules complain about the version of patchelf available in the normal repos
-# RUN apk -U add --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main \
-# 		patchelf \
-# 		musl-dev
-
-# version check in case we accidentally upgraded Python along the way
-RUN _pyver="$(python --version 2>&1 | sed -En 's|Python\s+([0-9.]*)|\1|p' | awk -F \. '{print $1"."$2}')" \
-	&& if [ "x${_pyver}" != "x${BUILD_PYTHON_VERSION}" ]; then \
-		echo "ERROR: Python reports version ${_pyver}, doesn't match build version ${BUILD_PYTHON_VERSION}"; \
-		echo "Exiting"; exit 1; fi
-
-ARG BUILDER_ROOT="/builder-root"
-WORKDIR "${BUILDER_ROOT}"
-
-# CARGO_NET_GIT_FETCH_WITH_CLI overcomes an 'Unable to update registry
-#	`crates-io`' error that appears in some builds for some architectures
-ENV	VIRTUAL_ENV="${BUILDER_ROOT}/venv" \
-		PYTHONUNBUFFERED="1" \
-		PYTHONDONTWRITEBYTECODE="1" \
-		MAKEFLAGS="-j$(nproc)" \
-		CARGO_NET_GIT_FETCH_WITH_CLI="true"
+# Python wheels from pre_build
+ARG IMPORTS_DIR=""
+ARG TARGET_ARCH_TAG=""
+COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
 
 # if we set the index via /etc/pip.conf it should work for 'virtualenv --download'
 # as well, since it uses pip for the downloading but won't take '--index-url' as
@@ -55,20 +27,6 @@ RUN printf '%s\n' '[global]' "  index-url = ${PYPI_INDEX}" \
 	"  trusted-host = $(echo "${PYPI_INDEX}" | cut -d'/' -f3 | cut -d':' -f1)" \
 	> /etc/pip.conf
 
-RUN python -m pip install --upgrade virtualenv
-
-RUN python -m virtualenv --download "${VIRTUAL_ENV}"
-
-# activate virtual env
-ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
-
-RUN python -m pip install --upgrade pip
-
-# Python wheels from pre_build
-ARG IMPORTS_DIR=""
-ARG TARGET_ARCH_TAG=""
-COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
-
 # install default modules that most builds will want
 #
 # first try installing all at once, if that fails try one at a time
@@ -76,11 +34,13 @@ COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
 # this combination should be the quickest, as one at a time is slow but if we
 # try to do all at once from PyPi (when all at once from IMPORTS_DIR fails) it
 # seems to install everything from PyPi and ignore the importable wheels
-ARG DEFAULT_MODULES="auditwheel cffi pycparser toml"
-RUN python -m pip install --no-index --find-links "/${IMPORTS_DIR}/" ${DEFAULT_MODULES} \
+ARG DEFAULT_MODULES
+RUN if [ ! -z "${DEFAULT_MODULES}" ]; then \
+	python -m pip install --no-index --find-links "/${IMPORTS_DIR}/" ${DEFAULT_MODULES} \
 	|| for module in ${DEFAULT_MODULES}; do \
 			echo "Installing ${module}.." \
-			&& python -m pip install --find-links "/${IMPORTS_DIR}/" "${module}"; done
+			&& python -m pip install --find-links "/${IMPORTS_DIR}/" "${module}"; done \
+	fi
 
 ARG MODULE_NAME
 ARG MODULE_VERSION
@@ -113,7 +73,6 @@ RUN if [ "x${SSL_LIBRARY}" != "xopenssl" ]; then NO_BINARY=1; fi \
 
 # auditwheel renames the wheels for musllinux, if appropriate
 # move wheels into WHEELS_DIR manually if it doesn't process them
-ARG NO_AUDITWHEEL
 RUN mkdir -p "${WHEELS_DIR}" \
 	&& if [ -z "${NO_AUDITWHEEL}" ]; then \
 		WHEEL_FILES="$(ls ${WHEELS_TEMP_DIR}/*)"; \

@@ -11,30 +11,27 @@
 #
 # A topological sort of the module dependency tree breaks the list of modules to
 # build into groups, so dependencies will be built first and then imported into
-# downstream buildws.
+# downstream builds.
 
 # Enable for extra output to the shell
 # DEBUG='true'
 
 # build if no arguments or 'core' are provided
-core_python_modules='pycparser cffi toml'
+core_python_modules='cffi'
 
 # defaults used by `all`, `update` and '*-pyall-*'
 default_python_versions='3.8 3.9 3.10 3.11 3.12'
 default_python_modules='
-  auditwheel
   cffi
-  toml
-  pycparser
   bcrypt
-  cryptography-openssl
   cryptography-libressl
+  cryptography-openssl
   lxml
   misaka
   mysqlclient
   ordered-set
-  paramiko-openssl
   paramiko-libressl
+  paramiko-openssl
   psutil
   psycopg2-binary
   PyNaCl
@@ -384,5 +381,3 @@ i=1; for group in "${groups[@]}"; do
     . hooks/.build.sh ${group}
   fi
 done
-
-rm -rf _dummyfile >/dev/null 2>&1
