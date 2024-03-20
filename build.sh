@@ -29,7 +29,7 @@ default_python_modules='
   lxml
   misaka
   mysqlclient
-  ordered-set
+  orderedset
   paramiko-libressl
   paramiko-openssl
   psutil
