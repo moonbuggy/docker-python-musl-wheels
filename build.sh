@@ -24,6 +24,7 @@ default_python_versions='3.8 3.9 3.10 3.11 3.12'
 default_python_modules='
   cffi
   bcrypt
+  bottlejwt
   cryptography-libressl
   cryptography-openssl
   lxml

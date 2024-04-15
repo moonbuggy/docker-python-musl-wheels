@@ -23,9 +23,10 @@ COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
 # as well, since it uses pip for the downloading but won't take '--index-url' as
 # an argument
 ARG PYPI_INDEX="https://pypi.org/simple"
-RUN printf '%s\n' '[global]' "  index-url = ${PYPI_INDEX}" \
-	"  trusted-host = $(echo "${PYPI_INDEX}" | cut -d'/' -f3 | cut -d':' -f1)" \
-	> /etc/pip.conf
+RUN (mv /etc/pip.conf /etc/pip.conf.bak || true) \
+	&& printf '%s\n' '[global]' "  index-url = ${PYPI_INDEX}" \
+		"  trusted-host = $(echo "${PYPI_INDEX}" | cut -d'/' -f3 | cut -d':' -f1)" \
+		>/etc/pip.conf
 
 # install default modules that most builds will want
 #
