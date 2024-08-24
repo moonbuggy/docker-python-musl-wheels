@@ -29,6 +29,7 @@ default_python_modules='
   cryptography-openssl
   lxml
   misaka
+  maturin
   mysqlclient
   orderedset
   paramiko-libressl
@@ -36,9 +37,6 @@ default_python_modules='
   psutil
   psycopg2-binary
   PyNaCl
-  pyOpenSSL
-  python-hosts
-  setuptools-rust
   zstandard'
 
 # don't copy binaries to the wheels/ folder of the build system
@@ -338,6 +336,7 @@ build_order=$(docker run --rm -ti moonbuggy2000/python-dependency-groups ${topo_
 #
 declare -a groups
 i=1; while read -r line; do
+  printf "line: %s\n" "${line}"
   group=()
   for mod in ${build_python_modules}; do
     mod_name_ver="$(get_data ${mod} name_ver)"

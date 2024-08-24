@@ -1,7 +1,7 @@
 #! /bin/sh
 
 mod_depends () {
-	return
+	echo "maturin"
 }
 
 mod_build () {

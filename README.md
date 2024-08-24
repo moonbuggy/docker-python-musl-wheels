@@ -54,7 +54,7 @@ Two different types of wheels are available:
     [moonbuggy2000/python-apline-wheels](https://hub.docker.com/r/moonbuggy2000/python-alpine-wheels)
     and wheel files will include `-linux` in the name.
 
-Wheel images are currently built in Alpine 3.18 with musl 1.2, although some
+Wheel images are currently built in Alpine 3.19 with musl 1.2, although some
 musl 1.1 wheels are available in `wheels/`.
 
 > [!NOTE]
