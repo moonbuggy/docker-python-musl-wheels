@@ -5,7 +5,9 @@ mod_depends () {
 }
 
 mod_build () {
-	apk add mariadb-connector-c-dev mariadb-dev
+	apk add mariadb-connector-c-dev mariadb-dev || { \
+		echo "*** failed to install requirements, exiting."; \
+		exit 1; }
 
 	echo "SSL library: ${SSL_LIBRARY}"
 

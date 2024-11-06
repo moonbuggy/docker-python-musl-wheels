@@ -1,23 +1,14 @@
 # syntax = docker/dockerfile:1.4.0
 
-ARG BUILD_PYTHON_VERSION="3.8"
-ARG FROM_IMAGE="moonbuggy2000/alpine-python-builder:${BUILD_PYTHON_VERSION}-alpine"
+ARG BUILD_PYTHON_VERSION="3.12"
+ARG BUILD_ALPINE_VERSION="3.19"
+ARG FROM_IMAGE="moonbuggy2000/alpine-python-builder:${BUILD_PYTHON_VERSION}-alpine${BUILD_ALPINE_VERSION}"
 
 ARG WHEELS_DIR="/wheels"
-
-ARG TARGET_ARCH_TAG
 
 ## build the wheel
 #
 FROM "${FROM_IMAGE}" AS builder
-
-# do this early so we break the cache between shared/no_shred builds
-ARG NO_AUDITWHEEL=""
-
-# Python wheels from pre_build
-ARG IMPORTS_DIR=""
-ARG TARGET_ARCH_TAG=""
-COPY _dummyfile "${IMPORTS_DIR}/${TARGET_ARCH_TAG}*" "/${IMPORTS_DIR}/"
 
 # if we set the index via /etc/pip.conf it should work for 'virtualenv --download'
 # as well, since it uses pip for the downloading but won't take '--index-url' as
@@ -29,6 +20,12 @@ RUN (mv /etc/pip.conf /etc/pip.conf.bak >/dev/null 2>&1 || true) \
 		>/etc/pip.conf
 
 RUN pip install --upgrade pip
+
+# Python wheels from pre_build
+ARG IMPORTS_DIR=""
+ARG TARGETARCH
+ARG TARGETVARIANT
+COPY _dummyfile "${IMPORTS_DIR}/${TARGETARCH}${TARGETVARIANT}*" "/${IMPORTS_DIR}/"
 
 # install default modules that most builds will want
 #
@@ -60,19 +57,27 @@ ENV MODULE_NAME="${MODULE_NAME}" \
 COPY scripts/ ./
 
 ARG NO_BINARY
-ARG QEMU_ARCH=""
 # build wheels and place in WHEELS_TEMP_DIR, we'll move them later with auditwheel
 RUN if [ "x${SSL_LIBRARY}" != "xopenssl" ]; then NO_BINARY=1; fi \
 	&& echo "Building ${MODULE_NAME}==${MODULE_VERSION}.." \
 	&& if [ ! -f "${MODULE_SCRIPT}" ]; then true; \
 		else . "${MODULE_SCRIPT}" && mod_build; fi \
 	&& [ ! -z "${WHEEL_BUILT_IN_SCRIPT+set}" ] \
-		|| python -m pip wheel --no-index --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" "${MODULE_NAME}==${MODULE_VERSION}" \
+		|| python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" \
+				--no-index \
+				"${MODULE_NAME}==${MODULE_VERSION}" \
 		|| if [ ! -z "${NO_BINARY}" ]; then \
-				python -m pip wheel --no-binary="${MODULE_NAME}" --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" "${MODULE_NAME}==${MODULE_VERSION}"; \
+				python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" \
+					--no-binary="${MODULE_NAME}" \
+					"${MODULE_NAME}==${MODULE_VERSION}"; \
 			else \
-				python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" "${MODULE_NAME}==${MODULE_VERSION}"; \
+				python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" \
+					"${MODULE_NAME}==${MODULE_VERSION}"; \
 			fi
+
+# the shared/no-shared builds are identical up until this point, so set this
+# argument as late sa possible
+ARG NO_AUDITWHEEL=""
 
 # auditwheel renames the wheels for musllinux, if appropriate
 # move wheels into WHEELS_DIR manually if it doesn't process them
@@ -85,7 +90,7 @@ RUN mkdir -p "${WHEELS_DIR}" \
 					mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
 				*) \
 					auditwheel repair -w "${WHEELS_DIR}" "${wheel_file}" \
-					|| mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
+						|| mv "${wheel_file}" "${WHEELS_DIR}/" ;; \
 			esac; done; \
 	else \
 		echo "Not running auditwheel."; \

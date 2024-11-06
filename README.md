@@ -18,11 +18,11 @@ Many Python modules don't currently have pre-built musl wheels, particularly for
 non-x64 architectures. This can result in slow Python builds in Docker because
 modules with no available wheel need to be built from source when the image is.
 
-This repo generates Docker images containing wheel files for the module, python
-version and architecture specified by the image tag. These images are intended
-to be used as part of a multi-stage Docker image build, providing pre-built
-wheels to a Python stage. The images contain wheels for the module in the tag
-and any dependencies.
+This repo generates Docker images containing wheel files for the module and
+python version specified by the image tag (older images also specify the
+architecture in the tags). These images are intended to be used as part of a
+multi-stage Docker image build, providing pre-built wheels to a Python stage.
+The images contain wheels for the module in the tag and any dependencies.
 
 > [!NOTE]
 > These are primarily intended for use in my own Docker images, to avoid
@@ -45,7 +45,7 @@ Two different types of wheels are available:
 *   Wheels without shared libraries
 
     These wheels will result in smaller final Docker images by relying on system
-    libraries rather than potentially duplicate shared libaries bundled in the
+    libraries rather than potentially duplicate shared libraries bundled in the
     wheel. The relevant system libraries will need to exist and be compatible
     with the libraries the wheels were built against, so these will be less
     portable.
@@ -79,27 +79,44 @@ OpenSSL builds by default. LibreSSL builds are usually available via the Docker
 images.
 
 ### Using the Docker images
-The image tag specifies the exact version and build as such:
+The newer builds only push a single multi-platform tag for each wheel, in the
+form:
+```
+moonbuggy2000/python-musl-wheels:<module><module_version>-py<python_version>
+```
 
+For example:
+```
+moonbuggy2000/python-musl-wheels:cryptography45.0.1-py3.8
+```
+
+Older builds pushed a standalone image for each architecture as such:
 ```
 moonbuggy2000/python-musl-wheels:<module><module_version>-py<python_version>-<arch>
 ```
 
 For example:
-
 ```
 moonbuggy2000/python-musl-wheels:cryptography3.4.8-py3.8-armv7
 ```
 
 #### Multi-stage build example
 ```dockerfile
-ARG PYTHON_VERISON="3.8"
+ARG PYTHON_VERSION="3.8"
 
-# get cryptography module
-FROM "moonbuggy2000/python-musl-wheels:cryptography3.4.8-py${PYTHON_VERSION}-armv7" AS mod_cryptography
+# get cryptography module from a multi-platform image
+FROM --platform="${TARGETPLATFORM}" \
+  "moonbuggy2000/python-musl-wheels:cryptography45.0.1-py${PYTHON_VERSION}" \
+  AS mod_cryptography
+
+# OR from an older single-architecture image
+FROM "moonbuggy2000/python-musl-wheels:cryptography3.4.8-py${PYTHON_VERSION}-armv7" \
+  AS mod_cryptography
 
 # get some other module
-FROM "moonbuggy2000/python-musl-wheels:some-other-module1.0.0-py${PYTHON_VERSION}-armv7" AS mod_some_other
+FROM --platform="${TARGETPLATFORM}" \
+  "moonbuggy2000/python-musl-wheels:some-other-module1.0.0-py${PYTHON_VERSION}" \
+  AS mod_some_other
 
 # build Python app image
 FROM "arm32v7/python:${PYTHON_VERSION}"
@@ -127,6 +144,9 @@ RUN python3 -m pip install --find-links /wheels/ cryptography some_other_module
 
 Everything except `./build.sh <module>` is optional. `<module>` can include an
 `-openssl` or `-libressl` suffix, where relevant.
+
+Currently, `-libressl` builds won't build for the _s390x_ architecture, as
+`libressl-dev` isn't available from the Alpine package repo.
 
 If no `<module_version>` is provided the latest version from PyPi will be built.
 If `<python_version>` is omitted the latest version from the Docker Hub
@@ -174,6 +194,7 @@ The most useful environmental variables are:
 | NO_PULL_WHEELS | false | don't pull any wheels from Docker Hub or locally |
 | WHEELS_FORCE_PULL | false | pull existing matching wheel from Docker Hub, even if it exists locally |
 | BUILD_NO_CACHE | false | don't use cached layers when building |
+| NO_BINARY | false | don't use existing binary wheel, force building |
 | NO_SHARED | false | build wheels without shared libraries |
 | BUILD_BOTH | false | build both types of wheels, with and without shared libraries |
 | CLEAN_CACHE | false | clear the local cache and pull fresh data for _all_/_core_/_check_/_update_ |
@@ -195,10 +216,6 @@ wheels into `wheels/` on the host and _not_ push any images to Docker Hub.
 # latest cryptography, libreSSL, latest Python, amd64 arch
 # push to Docker registry
 DO_PUSH=1 ./build.sh cryptography-libreSSL-amd64
-
-# cryptography 36.0.1, openSSL, Python 3.8, all arch
-# push existing local images to Docker registry without building
-DO_PUSH=1 NO_BUILD=1 ./build.sh cryptography36.0.1-py3.8
 
 # cryptography 36.0.1, openSSL, all default Python versions, amd64 arch
 # don't bundle shared libraries

@@ -10,5 +10,7 @@ mod_build () {
     libwebp-dev \
     libxcb-dev \
     openjpeg-dev \
-    zlib-dev
+    zlib-dev \
+	|| { echo "*** failed to install requirements, exiting."; \
+			exit 1; }
 }

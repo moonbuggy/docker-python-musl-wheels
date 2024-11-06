@@ -5,5 +5,7 @@ mod_depends () {
 }
 
 mod_build () {
-	apk -U add "postgresql-dev"
+	apk -U add postgresql-dev || { \
+		echo "*** failed to install requirements, exiting."; \
+		exit 1; }
 }

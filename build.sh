@@ -16,11 +16,26 @@
 # Enable for extra output to the shell
 # DEBUG='true'
 
+# we can use the string parsing and data collection/caching from the build hooks
+. "hooks/env"
+
+# cache expiry on API data from Docker Hub and PyPi just for this script layer
+# the expiry is still set in build.conf as usual, for the build stage
+CACHE_EXPIRY=86400
+
 # build if no arguments or 'core' are provided
 core_python_modules='cffi'
 
-# defaults used by `all`, `update` and '*-pyall-*'
-default_python_versions='3.8 3.9 3.10 3.11 3.12'
+# set defaults used by `all`, `update` and '*-pyall-*'
+#
+# manually specifed
+# default_python_versions='3.8 3.9 3.10 3.11 3.12 3.13'
+
+# OR
+# all versions available via moonbuggy2000/alpine-python-builder
+eval_param_ifn 'default_python_versions' \
+  "docker_api_repo_tags ${SOURCE_REPO} | grep -oP '^[0-9.]*(?=-alpine)' | awk -F \. '{print \$1\".\"\$2}' | sort -uV"
+
 default_python_modules='
   cffi
   bcrypt
@@ -52,7 +67,7 @@ prepare_no_shared () {
   DOCKER_REPO='moonbuggy2000/python-alpine-wheels'
 
   # don't use auditwheel to bundle shared libraries
-  NO_AUDITWHEEL=1
+  NO_AUDITWHEEL='true'
 
   # append a suffix to the build config filename to distinguish it from the
   # standard auditwheel builds
@@ -61,7 +76,7 @@ prepare_no_shared () {
   # remove auditwheel from defaults
   default_python_modules="${default_python_modules//auditwheel/}"
 
-  NO_SHARED=1
+  NO_SHARED='true'
 }
 
 prepare_with_shared () {
@@ -74,16 +89,6 @@ prepare_with_shared () {
 [ ! -z "${NO_SHARED}" ] \
   && prepare_no_shared \
   || prepare_with_shared
-
-# use the correct wheel repo in hooks/env
-WHEEL_REPO="${DOCKER_REPO}"
-
-# we can use the string parsing and data collection from the Docker build hooks
-. "hooks/env"
-
-# caching API data from Docker Hub and PyPi just for this script
-# cache expiry is still set in build.conf as usual, for the Docker build stage
-CACHE_EXPIRY=86400
 
 log_debug () { [ ! -z "${DEBUG}" ] && >&2 printf "$*\n"; }
 
@@ -134,6 +139,7 @@ get_mod_names () {
 
   local names=()
   if [ "${this_mod[py_ver]}" = "all" ] ; then
+    # shellcheck disable=SC2154
     for pv in ${default_python_versions}; do
       names+=("${name//pyall/py${pv}}")
     done
@@ -218,8 +224,19 @@ check_updates () {
     local mod_name
     mod_name="$(get_data ${mod} 'name')"
 
+    local mod_string
+    mod_string="$(get_data ${mod} 'string')"
+
+    local mod_ssl_lib
+    mod_ssl_lib="$(get_data ${mod} 'ssl_lib')"
+
+    local mod_repo_name
+    mod_repo_name="${mod_name}"
+    [ ! -z "${mod_ssl_lib}" ] \
+      && mod_repo_name="${mod_repo_name}-${mod_ssl_lib}"
+
     local safeMod
-    safeMod="$(safeString ${mod_name})"
+    safeMod="$(safeString ${mod_repo_name})"
 
     local temp_val
     temp_var="${safeMod}_pypi_ver"
@@ -232,7 +249,7 @@ check_updates () {
     temp_var="${safeMod}_repo_ver"
     repo_ver="${!temp_var}"
     if [ -z "${repo_ver}" ] || [[ ${CLEAN_CACHE} -ne 0 ]]; then
-      repo_ver="$(search_repo_tags "${mod_name}" "${REPO_TAGS}")"
+      repo_ver="$(search_repo_tags "${mod_repo_name}" "${REPO_TAGS}")"
     fi
     repo_ver="${repo_ver//${mod}/}"
     add_param "${repo_ver}" "${temp_var}"
@@ -318,14 +335,28 @@ log_debug 'Done adding modules.'
 # build a list of module names suitable for the topological sort
 #
 topo_names=''
+topo_count=0
 for mod in ${build_python_modules}; do
   topo_names="${topo_names}$(get_data ${mod} name_ver) "
+  : $((topo_count+=1))
 done
 
 # get build order from topological sort
 #
-printf '\nGetting build order..\n'
-build_order=$(docker run --rm -ti moonbuggy2000/python-dependency-groups ${topo_names})
+# at this stage of the build we're using '.build_data/config..yaml', since we've
+# not set a build tag yet, so to make the 'build_order' unique for this particular
+# '${repo_names}' string we'll need to stick a variable on the end of the
+# parameter we store in the config.yaml
+#
+printf '\nSetting build order..\n'
+if [ x"${topo_count}" = x"1" ]; then
+  build_order="${topo_names}"
+else
+  order_var="build_order_$(echo ${topo_names} | md5sum | cut -d' ' -f1)"
+  eval_param_ifn "${order_var}" \
+    "docker run --rm -ti moonbuggy2000/python-dependency-groups ${topo_names}"
+  build_order="$(echo ${!order_var} | sed -E 's|\r\W?|\n|')"
+fi
 
 # i=1; while read -r line; do
 #   printf '%3s: %s\n' "$((i++))" "${line}"
@@ -370,12 +401,12 @@ i=1; for group in "${groups[@]}"; do
   if [ ! -z "${BUILD_BOTH}" ]; then
     printf 'Building both with and without shared libraries.\n\n'
 
-    printf 'SHARED\n------\n'
-    prepare_with_shared
-    . hooks/.build.sh ${group}
-
     printf 'NO_SHARED\n---------\n'
     prepare_no_shared
+    . hooks/.build.sh ${group}
+
+    printf 'SHARED\n------\n'
+    prepare_with_shared
     . hooks/.build.sh ${group}
   else
     . hooks/.build.sh ${group}
