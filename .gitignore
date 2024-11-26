@@ -1,6 +1,7 @@
 .build_data
-__pycache__
-.imports
-lint.sh
-.qemu_static
+*.bak
 _dummyfile
+.qemu_static
+.include
+.imports
+__pycache__

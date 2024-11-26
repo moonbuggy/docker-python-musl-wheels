@@ -195,6 +195,7 @@ The most useful environmental variables are:
 | WHEELS_FORCE_PULL | false | pull existing matching wheel from Docker Hub, even if it exists locally |
 | BUILD_NO_CACHE | false | don't use cached layers when building |
 | NO_BINARY | false | don't use existing binary wheel, force building |
+| SHARED | false | build wheels with shared libraries |
 | NO_SHARED | false | build wheels without shared libraries |
 | BUILD_BOTH | false | build both types of wheels, with and without shared libraries |
 | CLEAN_CACHE | false | clear the local cache and pull fresh data for _all_/_core_/_check_/_update_ |

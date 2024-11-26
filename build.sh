@@ -29,12 +29,14 @@ core_python_modules='cffi'
 # set defaults used by `all`, `update` and '*-pyall-*'
 #
 # manually specifed
-# default_python_versions='3.8 3.9 3.10 3.11 3.12 3.13'
+# add_param '3.8 3.9 3.10 3.11 3.12 3.13' default_python_versions
 
 # OR
-# all versions available via moonbuggy2000/alpine-python-builder
-eval_param_ifn 'default_python_versions' \
-  "docker_api_repo_tags ${SOURCE_REPO} | grep -oP '^[0-9.]*(?=-alpine)' | awk -F \. '{print \$1\".\"\$2}' | sort -uV"
+# all versions available from moonbuggy2000/alpine-python-builder
+PYTHON_MINIMUM_VERSION="3.8"
+eval_param_ifn 'default_python_versions' "docker_api_repo_tags ${SOURCE_REPO} \
+  | grep -oP '^[0-9.]*(?=-alpine)' | awk -F \. '{print \$1\".\"\$2}' | sort -uV \
+  | xargs | sed -E \"s|.*(${PYTHON_MINIMUM_VERSION}.*)|\\\1|\""
 
 default_python_modules='
   cffi
@@ -52,7 +54,11 @@ default_python_modules='
   psutil
   psycopg2-binary
   PyNaCl
+  setuptools
   zstandard'
+
+# default to not building shared libraries
+NO_SHARED=1
 
 # don't copy binaries to the wheels/ folder of the build system
 # NO_WHEELS_OUT=1
@@ -64,6 +70,8 @@ unset DEFAULT_MODULES
 # set Docker repo and other build parameters based on whether we're bundling
 # shared libraries or not
 prepare_no_shared () {
+  printf 'NO_SHARED\n---------\n'
+
   DOCKER_REPO='moonbuggy2000/python-alpine-wheels'
 
   # don't use auditwheel to bundle shared libraries
@@ -80,15 +88,22 @@ prepare_no_shared () {
 }
 
 prepare_with_shared () {
+  printf 'SHARED\n------\n'
   DOCKER_REPO="moonbuggy2000/python-musl-wheels"
   CONFIG_SUFFIX=''
 
   unset NO_SHARED
 }
 
-[ ! -z "${NO_SHARED}" ] \
-  && prepare_no_shared \
-  || prepare_with_shared
+if [ ! -n "${BUILD_BOTH+set}" ]; then
+  if [ ! -z ${SHARED+set} ] || [ ! -z ${WITH_SHARED+set} ]; then
+    unset NO_SHARED
+  fi
+
+  [ ! -z "${NO_SHARED+set}" ] \
+    && prepare_no_shared \
+    || prepare_with_shared
+fi
 
 log_debug () { [ ! -z "${DEBUG}" ] && >&2 printf "$*\n"; }
 
@@ -398,14 +413,11 @@ i=1; for group in "${groups[@]}"; do
   #   && printf "[NOOP]\n\n" \
   #   && continue
 
-  if [ ! -z "${BUILD_BOTH}" ]; then
+  if [ ! -z "${BUILD_BOTH+set}" ]; then
     printf 'Building both with and without shared libraries.\n\n'
-
-    printf 'NO_SHARED\n---------\n'
     prepare_no_shared
     . hooks/.build.sh ${group}
 
-    printf 'SHARED\n------\n'
     prepare_with_shared
     . hooks/.build.sh ${group}
   else
