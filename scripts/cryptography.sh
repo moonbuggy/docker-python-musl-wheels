@@ -1,7 +1,9 @@
 #! /bin/sh
 
 mod_depends () {
-	echo "maturin"
+	# newer versions of setuptools aren't available for Python 3.8
+	# it's only used during the build, so as long as it builds older will do
+	echo "maturin setuptools73.0.1"
 }
 
 mod_build () {

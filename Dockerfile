@@ -48,6 +48,7 @@ ARG SSL_LIBRARY="openssl"
 ARG WHEELS_DIR
 ARG WHEELS_TEMP_DIR="/temp-wheels"
 
+# different modules diverge in the cache at this point
 ENV MODULE_NAME="${MODULE_NAME}" \
 	MODULE_VERSION="${MODULE_VERSION}" \
 	MODULE_SCRIPT="${MODULE_NAME}.sh" \
@@ -57,23 +58,30 @@ ENV MODULE_NAME="${MODULE_NAME}" \
 COPY scripts/ ./
 
 ARG NO_BINARY
+
 # build wheels and place in WHEELS_TEMP_DIR, we'll move them later with auditwheel
 RUN if [ "x${SSL_LIBRARY}" != "xopenssl" ]; then NO_BINARY=1; fi \
 	&& echo "Building ${MODULE_NAME}==${MODULE_VERSION}.." \
 	&& if [ ! -f "${MODULE_SCRIPT}" ]; then true; \
 		else . "${MODULE_SCRIPT}" && mod_build; fi \
-	&& [ ! -z "${WHEEL_BUILT_IN_SCRIPT+set}" ] \
+	&& if [ ! -n "${WHEEL_BUILT_IN_SCRIPT+set}" ]; then \
+		# force using sorce instead of binaries for this module and any dependencies \
+		[ ! -z "${NO_BINARY}" ] \
+			&& no_binary_string="--no-binary=${MODULE_NAME}" \
+			|| unset no_binary_string; \
+		# downloading things we need first makes the initial 'no-index' pip wheel \
+		# command more likely to succeed, which in turn makes it more likely we get \
+		# the right openssl/libressl version in the module's dependencies \
+		python -m pip download ${no_binary_string} \
+			--find-links "/${IMPORTS_DIR}/" --dest "/${IMPORTS_DIR}/" \
+			"${MODULE_NAME}==${MODULE_VERSION}" || true; \
+		# if we have everything we need already we can build with --no-index \
+		python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" \
+			--no-index "${MODULE_NAME}==${MODULE_VERSION}" \
+		# otherwise, build the wheel with module imports fromk PyPi \
 		|| python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" \
-				--no-index \
-				"${MODULE_NAME}==${MODULE_VERSION}" \
-		|| if [ ! -z "${NO_BINARY}" ]; then \
-				python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" \
-					--no-binary="${MODULE_NAME}" \
-					"${MODULE_NAME}==${MODULE_VERSION}"; \
-			else \
-				python -m pip wheel --find-links "/${IMPORTS_DIR}/" -w "${WHEELS_TEMP_DIR}" \
-					"${MODULE_NAME}==${MODULE_VERSION}"; \
-			fi
+			${no_binary_string} "${MODULE_NAME}==${MODULE_VERSION}"; \
+	fi
 
 # the shared/no-shared builds are identical up until this point, so set this
 # argument as late sa possible
@@ -96,7 +104,6 @@ RUN mkdir -p "${WHEELS_DIR}" \
 		echo "Not running auditwheel."; \
 		mv "${WHEELS_TEMP_DIR}"/* "${WHEELS_DIR}"; \
 	fi
-
 
 ## collect the wheels
 #
